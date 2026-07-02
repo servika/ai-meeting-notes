@@ -39,7 +39,7 @@ final class MeetingPromptController {
 		panel.hasShadow = true
 		panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 		panel.contentView = hosting
-		positionTopRight(panel)
+		positionTopCenter(panel)
 		panel.orderFrontRegardless()
 		self.panel = panel
 
@@ -53,13 +53,13 @@ final class MeetingPromptController {
 		panel?.orderOut(nil); panel = nil
 	}
 
-	/// Top-right of the active screen, just inside the visible area (below the menu bar).
-	private func positionTopRight(_ panel: NSPanel) {
+	/// Top-center of the active screen, just below the menu bar.
+	private func positionTopCenter(_ panel: NSPanel) {
 		guard let screen = NSScreen.main else { return }
 		let v = screen.visibleFrame
 		let s = panel.frame.size
 		let margin: CGFloat = 16
-		panel.setFrameOrigin(NSPoint(x: v.maxX - s.width - margin, y: v.maxY - s.height - margin))
+		panel.setFrameOrigin(NSPoint(x: v.midX - s.width / 2, y: v.maxY - s.height - margin))
 	}
 }
 

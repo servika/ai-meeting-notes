@@ -14,6 +14,17 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.34.0] - 2026-07-02
+
+#### Changed
+- **Meeting-detected prompt is now a desktop card, not an in-app banner.** When
+  another app starts using your microphone, a floating "Are you in a meeting?" card
+  (Start meeting notes / Not now) now appears at the **top-center of your screen**,
+  over whatever app you're in - so you actually see it during the call instead of
+  only inside this app's window. It doesn't steal focus and auto-dismisses if
+  ignored. Detection remains microphone-based (a real call uses your mic), which
+  avoids false alarms from things like a YouTube video.
+
 ### [0.33.0] - 2026-06-30
 
 #### Fixed

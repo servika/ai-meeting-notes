@@ -200,23 +200,9 @@ struct RecordPanel: View {
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 10) {
-			if detector.suggestRecording && !controller.isRecording && !controller.busy {
-				HStack(spacing: 8) {
-					Image(systemName: "dot.radiowaves.left.and.right").foregroundStyle(brand)
-					VStack(alignment: .leading, spacing: 1) {
-						Text("Meeting detected").font(.caption.weight(.semibold))
-						Text("Another app is using your mic.").font(.caption2).foregroundStyle(.secondary)
-					}
-					Spacer(minLength: 4)
-					Button("Record") { detector.clear(); controller.start() }
-						.controlSize(.small).buttonStyle(.borderedProminent)
-					Button { detector.dismiss() } label: { Image(systemName: "xmark") }
-						.controlSize(.small).buttonStyle(.borderless)
-				}
-				.padding(10)
-				.background(RoundedRectangle(cornerRadius: 10).fill(brand.opacity(0.1)))
-				.transition(.opacity)
-			}
+			// "Meeting detected" is surfaced as a desktop floating card (see
+			// MeetingPromptController), not an in-app banner, so it reaches you while
+			// you're in your meeting app rather than only inside this window.
 			// No notes folder yet: recording can't save anywhere, so make the fix
 			// obvious instead of silently doing nothing when Record is clicked.
 			if settings.meetingsDirURL == nil && !controller.isRecording && !controller.busy {

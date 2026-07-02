@@ -19,7 +19,7 @@ final class MeetingDetector: ObservableObject {
 	/// Whether suggestions are enabled in Settings.
 	var isEnabled: () -> Bool = { true }
 	/// Fired once on the rising edge when a meeting is first detected (and enabled).
-	/// Lets the app post a system notification alongside the in-app nudge.
+	/// Lets the app show the floating "are you in a meeting?" prompt.
 	var onDetected: () -> Void = {}
 
 	private var timer: Timer?

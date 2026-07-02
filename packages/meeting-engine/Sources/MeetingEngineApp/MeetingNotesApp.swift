@@ -20,12 +20,12 @@ struct MeetingNotesApp: App {
 		let cal = calendar
 		d.isBusy = { [weak c] in c?.isRecording == true || c?.busy == true }
 		d.isEnabled = { [weak s] in s?.suggestOnMeetingDetected ?? true }
-		// On detection, show the floating card over whatever app you're in (we're in
-		// the background then; the in-app banner covers the foreground). When the
+		// On detection, show the floating desktop card over whatever app you're in -
+		// always, since it's a desktop notification, not an in-app element. When the
 		// calendar is opted in, only prompt during a real event and name it.
 		d.onDetected = { [weak c, weak s, weak d] in
 			Task { @MainActor in
-				guard let c, let s, !NSApp.isActive else { return }
+				guard let c, let s else { return }
 				var subtitle = "Another app is using your microphone."
 				if s.useCalendarForMeetings {
 					guard let title = cal.currentEventTitle() else { return }
