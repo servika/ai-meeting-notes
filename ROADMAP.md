@@ -79,6 +79,17 @@ the macOS app untouched. Full step-by-step plan: **[WINDOWS-PLAN.md](WINDOWS-PLA
   reputation but needs a hardware token / cloud HSM) signed with `signtool` -
   would require swapping the signing steps in the workflow.
 
+## UX polish
+
+- **Don't show the Compress button while a meeting is still processing.**
+  Compression is the last pipeline step (transcribe → summarize → compress), so on a
+  long meeting the note appears with its raw WAVs on disk for several minutes before
+  they're compressed away. The Compress button is visible (though disabled) during
+  that window, which looks like auto-compression didn't happen. Fix: hide the button
+  while the meeting is busy/processing (only show it once idle *and* uncompressed WAVs
+  remain - i.e. a genuinely interrupted/failed recording), and/or show a brief
+  "Compressing…" status. Purely cosmetic; compression itself works correctly.
+
 ## Summary quality
 
 - **Meeting category (1:1, daily sync, planning, …).**
