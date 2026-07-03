@@ -14,6 +14,17 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.35.0] - 2026-07-03
+
+#### Fixed
+- **Compress button no longer appears while a meeting is still processing.** Because
+  compression is the last pipeline step (transcribe → summarize → compress), a long
+  meeting's note showed a Compress button for the minutes before its audio was
+  compressed - making it look like auto-compression hadn't run. It now shows only
+  when a meeting is idle and still has uncompressed WAVs (a genuinely interrupted or
+  failed recording); normal processing compresses at the end as before, with the
+  progress bar reporting it.
+
 ### [0.34.0] - 2026-07-02
 
 #### Changed

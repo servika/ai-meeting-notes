@@ -66,10 +66,13 @@ struct MeetingDetail: View {
 				Button { onRegenerate(settings.speakerRecognitionEnabled ? speakerCount : nil) } label: { Image(systemName: "arrow.clockwise") }
 					.help("Re-transcribe & summarize")
 					.disabled(busy)
-				if hasUncompressedAudio {
+				// Only offer Compress when the meeting is idle and still has WAVs -
+				// i.e. an interrupted/failed recording. During normal processing the
+				// pipeline compresses at the end, so showing it then just looks like
+				// auto-compression didn't happen (the busy bar already reports it).
+				if hasUncompressedAudio && !busy {
 					Button { onCompress() } label: { Image(systemName: "arrow.down.right.and.arrow.up.left") }
 						.help("Compress audio to save space (no re-transcribing)")
-						.disabled(busy)
 				}
 				Button(role: .destructive) { confirmingDelete = true } label: { Image(systemName: "trash") }
 					.help("Delete meeting")
