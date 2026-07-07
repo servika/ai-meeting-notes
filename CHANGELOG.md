@@ -14,6 +14,15 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.36.1] - 2026-07-07
+
+#### Fixed
+- **Trim window now closes after confirming a trim.** Confirming "Trim & Re-generate"
+  left the trim window open in a dead state (player unloaded, every control except
+  Cancel disabled) because the dismiss call from inside the confirmation dialog only
+  closed the dialog. The confirm action now closes the window itself; the trim ran
+  fine either way.
+
 ### [0.36.0] - 2026-07-07
 
 #### Added

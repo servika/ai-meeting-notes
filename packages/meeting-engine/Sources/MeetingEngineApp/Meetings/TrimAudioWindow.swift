@@ -11,6 +11,9 @@ struct TrimAudioWindow: View {
 	@EnvironmentObject var store: MeetingStore
 	@EnvironmentObject var controller: RecordingController
 	@Environment(\.dismiss) private var dismiss
+	// `dismiss` called from inside the confirmation dialog only closes the dialog,
+	// so the confirm action closes the whole window via `dismissWindow` instead.
+	@Environment(\.dismissWindow) private var dismissWindow
 	@StateObject private var player = MeetingAudioPlayer()
 	@State private var cutTime: Double = 0
 	@State private var confirming = false
@@ -110,7 +113,7 @@ struct TrimAudioWindow: View {
 			Button("Trim & Re-generate", role: .destructive) {
 				player.teardown()
 				controller.trimAudio(meeting, endSeconds: cutTime)
-				dismiss()
+				dismissWindow(id: "audio-trim")
 			}
 			Button("Cancel", role: .cancel) {}
 		} message: {
