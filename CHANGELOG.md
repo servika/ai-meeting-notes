@@ -14,6 +14,17 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.36.0] - 2026-07-07
+
+#### Added
+- **Trim recording.** For meetings where you forgot to stop recording (and the file
+  ends with unrelated audio), a new scissors button in the meeting's toolbar opens a
+  dedicated Trim window: listen with the built-in player, place the cut point (slider
+  or "Set to playhead"), and trim. Both tracks (mic + system, WAV or compressed m4a)
+  are shortened in place - each replaced atomically only after the shortened copy is
+  fully written - and the note is then re-transcribed and re-summarized from the
+  shorter audio, so the summary no longer includes the after-meeting noise.
+
 ### [0.35.0] - 2026-07-03
 
 #### Fixed

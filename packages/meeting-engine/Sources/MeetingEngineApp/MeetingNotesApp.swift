@@ -68,6 +68,18 @@ struct MeetingNotesApp: App {
 			SettingsView().environmentObject(settings).environmentObject(updates)
 		}
 
+		// Separate utility window for cutting the tail off a recording (opened from
+		// the scissors button in a meeting's toolbar; the value is the meeting id).
+		WindowGroup("Trim Audio", id: "audio-trim", for: String.self) { $meetingID in
+			if let id = meetingID {
+				TrimAudioWindow(meetingID: id)
+					.environmentObject(settings)
+					.environmentObject(store)
+					.environmentObject(controller)
+			}
+		}
+		.windowResizability(.contentSize)
+
 		MenuBarExtra {
 			MenuBarContent(controller: controller, detector: detector)
 		} label: {

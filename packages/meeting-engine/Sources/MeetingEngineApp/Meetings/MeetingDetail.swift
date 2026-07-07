@@ -14,6 +14,7 @@ struct MeetingDetail: View {
 	let onDelete: () -> Void
 	let onCancel: () -> Void
 	@EnvironmentObject var settings: AppSettings
+	@Environment(\.openWindow) private var openWindow
 
 	/// True when this meeting still has uncompressed WAV tracks on disk.
 	private var hasUncompressedAudio: Bool {
@@ -66,6 +67,12 @@ struct MeetingDetail: View {
 				Button { onRegenerate(settings.speakerRecognitionEnabled ? speakerCount : nil) } label: { Image(systemName: "arrow.clockwise") }
 					.help("Re-transcribe & summarize")
 					.disabled(busy)
+				// Cut the tail off a recording the user forgot to stop; opens a
+				// dedicated trim window. Needs playable audio to trim.
+				if !audioURLs.isEmpty && !busy {
+					Button { openWindow(id: "audio-trim", value: meeting.id) } label: { Image(systemName: "scissors") }
+						.help("Trim recording (cut off the end)")
+				}
 				// Only offer Compress when the meeting is idle and still has WAVs -
 				// i.e. an interrupted/failed recording. During normal processing the
 				// pipeline compresses at the end, so showing it then just looks like
@@ -179,6 +186,13 @@ struct MeetingDetail: View {
 		.onChange(of: meeting.id) {
 			titleField = meeting.title; speakerCount = meeting.speakerCount
 			let urls = audioURLs
+			Task { await player.load(urls: urls) }
+		}
+		// After a trim the meeting keeps its id but the audio got shorter - force
+		// the player to reload so its timeline matches the trimmed recording.
+		.onChange(of: meeting.durationSeconds) {
+			let urls = audioURLs
+			player.teardown()
 			Task { await player.load(urls: urls) }
 		}
 		.onDisappear { player.teardown() }

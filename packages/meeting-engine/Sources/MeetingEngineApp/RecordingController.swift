@@ -40,7 +40,8 @@ final class RecordingController: ObservableObject {
 	/// it counting down. 0 = unknown.
 	private var estimatedTotal: TimeInterval = 0
 	private var cancelToken: CancelToken?
-	private let settings: AppSettings
+	// Internal (not private) so the RecordingController+… extension files can use it.
+	let settings: AppSettings
 	private let store: MeetingStore
 
 	init(settings: AppSettings, store: MeetingStore) {
