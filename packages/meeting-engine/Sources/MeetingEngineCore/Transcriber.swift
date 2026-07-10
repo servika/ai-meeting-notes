@@ -55,6 +55,10 @@ public enum Transcriber {
 		// present - together these avoid hallucinations on silence (e.g. repeated
 		// "Дякую за перегляд!") and improve accuracy by skipping non-speech.
 		args += ["--suppress-nst"]
+		// Don't condition each window on previously decoded text (-mc 0). With the
+		// default unlimited context, one repeated sentence feeds back into the
+		// decoder and locks long recordings into an hour-long repetition loop.
+		args += ["-mc", "0"]
 		if let vad = bundledVADModel() {
 			args += ["--vad", "--vad-model", vad]
 		}

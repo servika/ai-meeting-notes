@@ -14,6 +14,16 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.37.1] - 2026-07-10
+
+#### Fixed
+- **Repetition loops in long transcripts.** Whisper conditions each 30-second
+  window on the text it already decoded; on long recordings one repeated sentence
+  could feed back into the decoder and replace the rest of the transcript with the
+  same phrase over and over. Transcription now runs with context conditioning
+  disabled (`-mc 0`), which eliminates the loop while keeping the content intact
+  (verified against a 70-minute recording that previously looped for an hour).
+
 ### [0.37.0] - 2026-07-07
 
 #### Added
