@@ -17,6 +17,7 @@ struct TrimAudioWindow: View {
 	@StateObject private var player = MeetingAudioPlayer()
 	@State private var cutTime: Double = 0
 	@State private var confirming = false
+	@State private var waveform: [Float] = []
 
 	private var meeting: Meeting? { store.meetings.first { $0.id == meetingID } }
 
@@ -59,6 +60,7 @@ struct TrimAudioWindow: View {
 			Task {
 				await player.load(urls: urls)
 				cutTime = player.duration
+				waveform = await TrimWaveform.levels(for: urls, buckets: 240)
 			}
 		}
 		.onDisappear { player.teardown() }
@@ -77,6 +79,15 @@ struct TrimAudioWindow: View {
 
 			AudioPlayerView(player: player)
 				.padding(.horizontal, -20) // undo the player's built-in inset to align with this window
+
+			if !waveform.isEmpty {
+				VStack(alignment: .leading, spacing: 4) {
+					TrimWaveformView(levels: waveform, duration: player.duration, cutTime: $cutTime)
+					Text("Loudness over time - dim bars are quiet, so the meeting likely ended where the sound dies down. Click the diagram to place the cut point.")
+						.font(.caption).foregroundStyle(.secondary)
+						.fixedSize(horizontal: false, vertical: true)
+				}
+			}
 
 			VStack(alignment: .leading, spacing: 6) {
 				HStack {

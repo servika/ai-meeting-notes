@@ -14,6 +14,15 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.37.0] - 2026-07-07
+
+#### Added
+- **Loudness diagram in the Trim window.** The trim screen now shows a compact
+  waveform-style strip of the recording's loudness over time: quiet stretches are
+  dimmed so the spot where the meeting actually ended (sound dies down, but the
+  recording keeps going) stands out at a glance. The part that would be removed is
+  tinted red, and clicking or dragging on the diagram places the cut point directly.
+
 ### [0.36.1] - 2026-07-07
 
 #### Fixed
