@@ -72,12 +72,25 @@ enum TrimWaveform {
 }
 
 /// Compact loudness strip for the Trim window: one bar per bucket, quiet
-/// stretches dimmed so the spot where the meeting ended stands out, the part
-/// that would be cut tinted red, and a click/drag places the cut point.
+/// stretches dimmed so the spot where the meeting ended stands out, and the part
+/// that would be cut tinted red. A moving playhead ties the diagram to playback:
+/// a plain click seeks the audio there, while the red cut marker is moved by
+/// dragging it.
 struct TrimWaveformView: View {
 	let levels: [Float]
 	let duration: Double
 	@Binding var cutTime: Double
+	/// Current playback position, drawn as the playhead.
+	let currentTime: Double
+	/// Seek playback to a time (seconds), called when the user clicks the diagram.
+	let onSeek: (Double) -> Void
+
+	/// Half-width (points) of the grab zone around the cut marker.
+	private static let handleGrab: CGFloat = 12
+
+	/// What the in-flight drag manipulates, decided when the press lands.
+	@State private var dragMode: DragMode?
+	private enum DragMode { case cut, seek }
 
 	var body: some View {
 		GeometryReader { geo in
@@ -97,19 +110,34 @@ struct TrimWaveformView: View {
 						: (quiet ? .secondary.opacity(0.3) : .accentColor)
 					context.fill(Path(roundedRect: bar, cornerRadius: barWidth / 3), with: .color(color))
 				}
+				// Playhead (below the cut marker so the cut point always stays visible).
+				if duration > 0 {
+					let playX = size.width * CGFloat(min(max(currentTime / duration, 0), 1))
+					context.fill(Path(CGRect(x: playX - 0.75, y: 0, width: 1.5, height: size.height)),
+						with: .color(.primary.opacity(0.7)))
+				}
 				// Cut marker on top of the bars.
 				context.fill(Path(CGRect(x: cutX - 0.75, y: 0, width: 1.5, height: size.height)),
 					with: .color(.red))
 			}
 			.contentShape(Rectangle())
 			.gesture(
-				DragGesture(minimumDistance: 0).onChanged { value in
-					guard duration > 0 else { return }
-					cutTime = min(max(value.location.x / geo.size.width, 0), 1) * duration
-				}
+				DragGesture(minimumDistance: 0)
+					.onChanged { value in
+						guard duration > 0, geo.size.width > 0 else { return }
+						let cutX = geo.size.width * CGFloat(cutTime / duration)
+						// Grabbing on (or very near) the cut marker moves the cut point;
+						// pressing anywhere else scrubs playback.
+						if dragMode == nil {
+							dragMode = abs(value.startLocation.x - cutX) <= Self.handleGrab ? .cut : .seek
+						}
+						let t = min(max(value.location.x / geo.size.width, 0), 1) * duration
+						if dragMode == .cut { cutTime = t } else { onSeek(t) }
+					}
+					.onEnded { _ in dragMode = nil }
 			)
 		}
 		.frame(height: 44)
-		.help("Loudness over time - dim bars are quiet. Click or drag to place the cut point.")
+		.help("Loudness over time - dim bars are quiet. Click to seek playback here; drag the red marker to place the cut point.")
 	}
 }

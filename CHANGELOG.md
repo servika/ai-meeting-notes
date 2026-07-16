@@ -14,6 +14,18 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.38.0] - 2026-07-16
+
+#### Added
+- **Playhead on the Trim loudness diagram.** The diagram now shows a moving line
+  that follows playback, so the audio position is aligned with the loudness bars.
+  Clicking anywhere on the diagram seeks playback to that spot (to listen around
+  the cut); the cut point is now placed by dragging the red marker.
+
+#### Changed
+- **The "Are you in a meeting?" prompt now dismisses itself after 6 seconds**
+  instead of 30, so an ignored prompt clears out of the way quickly.
+
 ### [0.37.1] - 2026-07-10
 
 #### Fixed

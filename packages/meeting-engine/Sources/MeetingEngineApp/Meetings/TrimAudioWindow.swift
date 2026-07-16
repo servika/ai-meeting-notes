@@ -82,8 +82,9 @@ struct TrimAudioWindow: View {
 
 			if !waveform.isEmpty {
 				VStack(alignment: .leading, spacing: 4) {
-					TrimWaveformView(levels: waveform, duration: player.duration, cutTime: $cutTime)
-					Text("Loudness over time - dim bars are quiet, so the meeting likely ended where the sound dies down. Click the diagram to place the cut point.")
+					TrimWaveformView(levels: waveform, duration: player.duration, cutTime: $cutTime,
+						currentTime: player.currentTime, onSeek: { player.seek(to: $0) })
+					Text("Loudness over time - dim bars are quiet, so the meeting likely ended where the sound dies down. The line follows playback; click to listen from a spot, then drag the red marker to place the cut point.")
 						.font(.caption).foregroundStyle(.secondary)
 						.fixedSize(horizontal: false, vertical: true)
 				}

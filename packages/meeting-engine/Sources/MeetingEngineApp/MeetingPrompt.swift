@@ -15,7 +15,7 @@ final class MeetingPromptController {
 	private var panel: NSPanel?
 	private var dismissTimer: Timer?
 	/// Seconds the card lingers before quietly dismissing itself.
-	private let autoDismissAfter: TimeInterval = 30
+	private let autoDismissAfter: TimeInterval = 6
 
 	/// Show the prompt. `subtitle` carries the context (calendar event or generic).
 	/// `onStart` / `onDismiss` fire on the respective button (or auto-dismiss).
