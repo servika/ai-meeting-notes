@@ -695,6 +695,11 @@ First release of the standalone macOS app.
 
 ## Windows app
 
+> ⏸️ **Builds paused (2026-07-17).** New Windows builds are temporarily on hold
+> while the build environment is unavailable. The source under
+> `packages/meeting-notes-windows` and the existing beta releases are unchanged;
+> this pause is expected to be reversible.
+
 ### [0.2.0] - 2026-06-25
 
 #### Changed
@@ -724,6 +729,11 @@ First release of the standalone macOS app.
   Markdown notes, in-app whisper-model download, self-contained installer + zip.
 
 ## Obsidian plugin
+
+> 🪦 **Retired (2026-07-17).** No longer maintained and fully superseded by the
+> macOS app, which writes the same Markdown notes into any folder (including an
+> Obsidian vault) with no loopback-device setup. The source under
+> `packages/ai-meeting-notes` is kept for the record only.
 
 ### [0.1.0] - 2026-06-12
 

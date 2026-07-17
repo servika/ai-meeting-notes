@@ -53,16 +53,15 @@
 
 <header class="hero">
   <div class="wrap">
-    <span class="badge">macOS &amp; Windows · 100% local · open source</span>
+    <span class="badge">macOS · 100% local · open source</span>
     <h1>AI Meeting Notes</h1>
     <p class="tag">Record your meetings - your microphone <em>and</em> everyone else on the call - then transcribe and summarize them entirely on your machine. No cloud required. No virtual audio device.</p>
     <div class="cta">
       <a class="btn primary" href="https://github.com/servika/ai-meeting-notes/releases/latest/download/AI-Meeting-Notes.dmg">Download for macOS<span id="latest-version"></span></a>
-      <a class="btn ghost" href="https://github.com/servika/ai-meeting-notes/releases?q=win&amp;expanded=true">Download for Windows (beta)</a>
       <a class="btn ghost" href="https://github.com/servika/ai-meeting-notes/blob/main/docs/MACOS-GUIDE.md">User guide</a>
       <a class="btn ghost" href="https://github.com/servika/ai-meeting-notes">View on GitHub</a>
     </div>
-    <p class="pill" style="color:rgba(255,255,255,.85);margin:14px 0 0">macOS 14.4+ (signed &amp; notarized) · Windows 10/11 · <a style="color:#fff;text-decoration:underline" href="https://github.com/servika/ai-meeting-notes/releases/latest">all releases</a></p>
+    <p class="pill" style="color:rgba(255,255,255,.85);margin:14px 0 0">macOS 14.4+ (signed &amp; notarized) · Windows builds paused for now · <a style="color:#fff;text-decoration:underline" href="https://github.com/servika/ai-meeting-notes/releases/latest">all releases</a></p>
   </div>
 </header>
 
@@ -121,8 +120,8 @@
         <p><a href="https://github.com/servika/ai-meeting-notes/releases/latest/download/AI-Meeting-Notes.dmg">Download the <code>.dmg</code></a>, open it, and drag <strong>AI Meeting Notes</strong> to Applications. It's signed &amp; notarized by Apple, so it opens with no Gatekeeper warning.</p>
       </div>
       <div class="card">
-        <h4>🪟 Windows <span class="pill">beta</span></h4>
-        <p><a href="https://github.com/servika/ai-meeting-notes/releases?q=win&amp;expanded=true">Download the installer</a> (or portable zip) and run it. Self-contained - no .NET install needed. Windows 10/11.</p>
+        <h4>🪟 Windows <span class="pill">paused</span></h4>
+        <p>Windows builds are on hold for now while the build environment is unavailable. The <a href="https://github.com/servika/ai-meeting-notes/tree/main/packages/meeting-notes-windows">code stays in the repo</a> and earlier <a href="https://github.com/servika/ai-meeting-notes/releases?q=win&amp;expanded=true">beta releases</a> remain downloadable, but aren't currently maintained.</p>
       </div>
     </div>
 
@@ -174,7 +173,7 @@ dotnet run --project src/MeetingNotes.App</code></pre>
 <footer>
   <div class="wrap">
     <p>AI Meeting Notes · <a href="https://github.com/servika/ai-meeting-notes">github.com/servika/ai-meeting-notes</a> · MIT License</p>
-    <p class="pill">Using Obsidian and want recording inside your vault? There's a <a href="obsidian.html">legacy Obsidian plugin</a> (superseded by the app).</p>
+    <p class="pill">There's also a <a href="obsidian.html">retired Obsidian plugin</a> - fully superseded by the app and no longer maintained. You don't need it: the app writes notes straight into any folder, including an Obsidian vault.</p>
   </div>
 </footer>
 

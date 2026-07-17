@@ -45,7 +45,13 @@ AI summaries, and a built-in meetings library.
 signed & notarized, opens with no Gatekeeper warning. Details:
 **[packages/meeting-engine/README.md](packages/meeting-engine/README.md)**.
 
-### 🪟 Windows (beta)
+### 🪟 Windows (paused)
+
+> **Builds are temporarily paused** while the Windows build environment is
+> unavailable. The source stays in the repo and earlier
+> [beta releases](https://github.com/servika/ai-meeting-notes/releases?q=win&expanded=true)
+> remain downloadable, but new builds aren't being produced and the port isn't
+> currently maintained.
 
 The same record → transcribe → summarize flow, capturing system audio via WASAPI
 loopback + the mic via WASAPI - also **no virtual audio device**. Self-contained
@@ -74,9 +80,10 @@ render as inline players and the `type: meeting` frontmatter becomes queryable
 (e.g. with Dataview). That's the whole integration - the app never depends on
 Obsidian.
 
-There is also a **legacy Obsidian plugin** that records inside Obsidian itself
-(it predates the desktop apps and needs a loopback-device setup the apps avoid).
-It's deprecated in favor of the desktop apps - see
+There is also a **retired Obsidian plugin** that records inside Obsidian itself
+(it predates the app and needs a loopback-device setup the app avoids). It's **no
+longer maintained** and superseded by the app in every respect - you don't need it
+for the vault workflow above. Kept for the record only - see
 **[packages/ai-meeting-notes/README.md](packages/ai-meeting-notes/README.md)**.
 
 ## Privacy
