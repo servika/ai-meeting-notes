@@ -57,7 +57,7 @@
     <h1>AI Meeting Notes</h1>
     <p class="tag">Record your meetings - your microphone <em>and</em> everyone else on the call - then transcribe and summarize them entirely on your machine. No cloud required. No virtual audio device.</p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/servika/ai-meeting-notes/releases/latest/download/AI-Meeting-Notes.dmg">Download for macOS</a>
+      <a class="btn primary" href="https://github.com/servika/ai-meeting-notes/releases/latest/download/AI-Meeting-Notes.dmg">Download for macOS<span id="latest-version"></span></a>
       <a class="btn ghost" href="https://github.com/servika/ai-meeting-notes/releases?q=win&amp;expanded=true">Download for Windows (beta)</a>
       <a class="btn ghost" href="https://github.com/servika/ai-meeting-notes/blob/main/docs/MACOS-GUIDE.md">User guide</a>
       <a class="btn ghost" href="https://github.com/servika/ai-meeting-notes">View on GitHub</a>
@@ -177,6 +177,19 @@ dotnet run --project src/MeetingNotes.App</code></pre>
     <p class="pill">Using Obsidian and want recording inside your vault? There's a <a href="obsidian.html">legacy Obsidian plugin</a> (superseded by the app).</p>
   </div>
 </footer>
+
+<script>
+	// Label the download button with the newest release. The button's URL always
+	// serves the latest DMG on its own, so any failure here (offline, API rate
+	// limit) just leaves the plain label rather than breaking the download.
+	fetch("https://api.github.com/repos/servika/ai-meeting-notes/releases/latest")
+		.then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+		.then(function (release) {
+			if (!release.tag_name) return;
+			document.getElementById("latest-version").textContent = " " + release.tag_name;
+		})
+		.catch(function () {});
+</script>
 
 </body>
 </html>
