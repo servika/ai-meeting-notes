@@ -97,6 +97,109 @@ public static class Transcriber
         return string.Join("\n\n", blocks);
     }
 
+    /// <summary>
+    /// Remove cross-track echo before merging. Port of macOS 0.29.0 fix.
+    /// In an in-person or speakerphone meeting the mic ("You") and system
+    /// ("Them") tracks capture the same room, so every utterance is transcribed
+    /// on *both* tracks. This drops a segment only when its words are largely
+    /// already covered by kept segments from the other speaker at the same time.
+    /// Segments are processed richest-first so the most complete copy survives.
+    /// Genuine remote meetings are unaffected (different audio per track means
+    /// no word + time overlap).
+    /// </summary>
+    public static List<TranscriptSegment> RemoveCrossTrackEchoes(List<TranscriptSegment> segments)
+    {
+        if (segments.Count == 0) return segments;
+        var speakers = new HashSet<string>(segments.Select(s => s.Speaker));
+        if (speakers.Count < 2) return segments;
+
+        const double window = 6.0;
+        const double containmentThreshold = 0.75;
+        const int minTokens = 4;
+
+        var tokens = segments.Select(s => NormalizedTokens(s.Text)).ToArray();
+
+        // Position by start time so each segment only scans nearby ones.
+        var byStart = Enumerable.Range(0, segments.Count)
+            .OrderBy(i => segments[i].Start).ToArray();
+        var pos = new int[segments.Count];
+        for (var p = 0; p < byStart.Length; p++) pos[byStart[p]] = p;
+
+        // Decide keep/drop richest-first (more tokens, then earlier, then speaker).
+        var byRichness = Enumerable.Range(0, segments.Count)
+            .OrderByDescending(i => tokens[i].Length)
+            .ThenBy(i => segments[i].Start)
+            .ThenBy(i => segments[i].Speaker, StringComparer.Ordinal)
+            .ToArray();
+
+        var kept = new HashSet<int>();
+        var dropped = new HashSet<int>();
+
+        foreach (var i in byRichness)
+        {
+            if (tokens[i].Length < minTokens) { kept.Add(i); continue; }
+            var si = segments[i];
+
+            // Pool tokens from already-KEPT opposite-speaker segments overlapping i.
+            var pool = new Dictionary<string, int>();
+            foreach (var dir in new[] { -1, 1 })
+            {
+                var p = pos[i] + dir;
+                while (p >= 0 && p < byStart.Length)
+                {
+                    var j = byStart[p];
+                    var sj = segments[j];
+                    if (dir == 1 && sj.Start > si.End + window) break;
+                    if (dir == -1 && sj.End < si.Start - window) break;
+                    p += dir;
+                    if (sj.Speaker == si.Speaker || !kept.Contains(j)) continue;
+                    if (!(sj.Start <= si.End + window && sj.End >= si.Start - window)) continue;
+                    foreach (var t in tokens[j])
+                    {
+                        pool.TryGetValue(t, out var cnt);
+                        pool[t] = cnt + 1;
+                    }
+                }
+            }
+
+            // Multiset containment of i's words within the kept other-track tokens.
+            var matched = 0;
+            foreach (var t in tokens[i])
+            {
+                if (pool.TryGetValue(t, out var cnt) && cnt > 0)
+                {
+                    pool[t] = cnt - 1;
+                    matched++;
+                }
+            }
+            if ((double)matched / tokens[i].Length >= containmentThreshold)
+                dropped.Add(i);
+            else
+                kept.Add(i);
+        }
+
+        return segments.Where((_, idx) => !dropped.Contains(idx)).ToList();
+    }
+
+    /// <summary>Lowercased alphanumeric word tokens (Unicode-aware).</summary>
+    internal static string[] NormalizedTokens(string text)
+    {
+        var words = new List<string>();
+        var sb = new StringBuilder();
+        foreach (var c in text.ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(c))
+                sb.Append(c);
+            else if (sb.Length > 0)
+            {
+                words.Add(sb.ToString());
+                sb.Clear();
+            }
+        }
+        if (sb.Length > 0) words.Add(sb.ToString());
+        return words.ToArray();
+    }
+
     /// <summary>Format seconds-from-start as <c>m:ss</c>, or <c>h:mm:ss</c> past an hour.</summary>
     internal static string Timestamp(double seconds)
     {

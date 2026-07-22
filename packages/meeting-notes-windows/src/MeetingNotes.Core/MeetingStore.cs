@@ -25,12 +25,14 @@ public sealed class MeetingStore(string meetingsFolder)
     /// <summary>Write (or overwrite) a meeting note named <paramref name="title"/>.md. Returns its path.</summary>
     public string WriteNote(
         string title, DateTime date, string audioBase, int durationSeconds,
-        int speakerCount, string summary, string transcript, string appVersion)
+        int speakerCount, string summary, string transcript, string appVersion,
+        string audioExt = "wav")
     {
         Directory.CreateDirectory(meetingsFolder);
         var body = NoteFormat.BuildNote(
             title, date.ToString(DateFormat, CultureInfo.InvariantCulture),
-            audioBase, durationSeconds, speakerCount, summary, transcript, appVersion);
+            audioBase, durationSeconds, speakerCount, summary, transcript, appVersion,
+            audioExt);
         var path = Path.Combine(meetingsFolder, Sanitize(title) + ".md");
         File.WriteAllText(path, body);
         return path;
@@ -64,6 +66,16 @@ public sealed class MeetingStore(string meetingsFolder)
         var dest = Path.Combine(dir, safe + ".md");
         if (File.Exists(dest)) return null;
         File.Move(meeting.Path, dest);
+        // Keep the note's "# H1" heading in step with the filename (mirrors the
+        // macOS rename fix) so the old title doesn't linger in the body or leak
+        // into a later re-generation.
+        try
+        {
+            var content = File.ReadAllText(dest);
+            var updated = NoteFormat.ReplaceFirstHeading(content, safe);
+            if (updated != content) File.WriteAllText(dest, updated);
+        }
+        catch { /* best effort - the rename itself already succeeded */ }
         return dest;
     }
 
@@ -75,7 +87,7 @@ public sealed class MeetingStore(string meetingsFolder)
         var audioBase = NoteFormat.FrontmatterValue("audio", content) ?? $"recordings/{meeting.Title}";
         TryDelete(meeting.Path);
         if (FindNoteByAudio(audioBase, dir) is null)
-            foreach (var ext in new[] { "system.wav", "mic.wav" })
+            foreach (var ext in new[] { "system.wav", "mic.wav", "system.m4a", "mic.m4a" })
                 TryDelete(Path.Combine(dir, NormalizeRelative(audioBase) + "." + ext));
     }
 
@@ -89,9 +101,18 @@ public sealed class MeetingStore(string meetingsFolder)
         return null;
     }
 
-    /// <summary>Sanitize a title into a safe note filename stem (mirrors the macOS rename rules).</summary>
-    internal static string Sanitize(string name) =>
-        name.Replace('/', '-').Replace(':', '-').Trim();
+    /// <summary>
+    /// Sanitize a title into a safe note filename stem. Replaces all characters
+    /// forbidden on Windows (<c>/ \ : * ? " &lt; &gt; |</c>) with dashes and
+    /// strips leading/trailing whitespace.
+    /// </summary>
+    internal static string Sanitize(string name)
+    {
+        var s = name;
+        foreach (var c in new[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|' })
+            s = s.Replace(c, '-');
+        return s.Trim();
+    }
 
     private static string NormalizeRelative(string p) => p.Replace('/', Path.DirectorySeparatorChar);
 

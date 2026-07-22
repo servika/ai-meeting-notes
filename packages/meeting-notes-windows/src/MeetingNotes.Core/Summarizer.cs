@@ -31,11 +31,15 @@ public sealed class Summarizer(HttpClient http)
     internal const int ChunkChars = 60_000;
 
     public async Task<string> SummarizeAsync(
-        string transcript, string prompt, SummaryEngine engine, CancellationToken ct = default)
+        string transcript, string prompt, SummaryEngine engine,
+        CancellationToken ct = default, IProgress<string>? progress = null)
     {
         // Short/medium meetings: one pass.
         if (transcript.Length <= MapReduceThresholdChars)
+        {
+            progress?.Report("Summarizing (single pass)…");
             return await RunAsync(Fill(prompt, transcript), engine, keepAlive: 0, ct);
+        }
 
         // Long meetings: map-reduce. Summarize each chunk into partial notes (model
         // kept loaded between chunks), then combine those into the final summary.
@@ -43,9 +47,11 @@ public sealed class Summarizer(HttpClient http)
         var partials = new List<string>();
         for (var i = 0; i < chunks.Count; i++)
         {
+            progress?.Report($"Summarizing chunk {i + 1}/{chunks.Count}…");
             var mapped = await RunAsync(MapPrompt(chunks[i], i + 1, chunks.Count), engine, keepAlive: 300, ct);
             if (mapped.Length > 0) partials.Add($"## Part {i + 1} of {chunks.Count}\n{mapped}");
         }
+        progress?.Report("Combining summaries…");
         var combined = string.Join("\n\n", partials);
         return await RunAsync(Fill(prompt, combined), engine, keepAlive: 0, ct);
     }

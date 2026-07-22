@@ -65,4 +65,66 @@ public class TranscriberTests
     {
         Assert.Equal(expected, Transcriber.Timestamp(seconds));
     }
+
+    [Fact]
+    public void NormalizedTokens_splits_and_lowercases()
+    {
+        var tokens = Transcriber.NormalizedTokens("Hello, World! Ок 123");
+        Assert.Equal(new[] { "hello", "world", "ок", "123" }, tokens);
+    }
+
+    [Fact]
+    public void RemoveCrossTrackEchoes_drops_duplicate_across_speakers()
+    {
+        // Simulate in-person meeting: same words appear on both tracks at the same time.
+        var segs = new List<TranscriptSegment>
+        {
+            new(0.0, 3.0, "Let us discuss the quarterly budget review today", "You"),
+            new(0.5, 3.5, "Let us discuss the quarterly budget review today", "Them"),
+            new(5.0, 7.0, "Sounds good to me", "Them"),
+        };
+        var result = Transcriber.RemoveCrossTrackEchoes(segs);
+        // The duplicate should be dropped; the unique segment kept.
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, s => s.Text.Contains("budget") && s.Speaker == "You");
+        Assert.Contains(result, s => s.Text.Contains("Sounds good"));
+    }
+
+    [Fact]
+    public void RemoveCrossTrackEchoes_keeps_different_content_across_speakers()
+    {
+        // Genuine remote meeting: different content on each track.
+        var segs = new List<TranscriptSegment>
+        {
+            new(0.0, 3.0, "How is the project going on your end", "You"),
+            new(4.0, 7.0, "We finished the backend last week and started testing", "Them"),
+        };
+        var result = Transcriber.RemoveCrossTrackEchoes(segs);
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public void RemoveCrossTrackEchoes_skips_short_segments()
+    {
+        // Short segments (< 4 tokens) are never dropped even if duplicated.
+        var segs = new List<TranscriptSegment>
+        {
+            new(0.0, 1.0, "yes okay", "You"),
+            new(0.5, 1.5, "yes okay", "Them"),
+        };
+        var result = Transcriber.RemoveCrossTrackEchoes(segs);
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public void RemoveCrossTrackEchoes_single_speaker_noop()
+    {
+        var segs = new List<TranscriptSegment>
+        {
+            new(0.0, 1.0, "Hello world this is a test sentence", "You"),
+            new(2.0, 3.0, "Another test sentence here for testing", "You"),
+        };
+        var result = Transcriber.RemoveCrossTrackEchoes(segs);
+        Assert.Equal(2, result.Count);
+    }
 }

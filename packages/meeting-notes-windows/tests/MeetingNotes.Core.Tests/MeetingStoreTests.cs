@@ -45,6 +45,12 @@ public class MeetingStoreTests : IDisposable
     }
 
     [Fact]
+    public void Sanitize_replaces_all_windows_forbidden_characters()
+    {
+        Assert.Equal("a-b-c-d-e-f-g-h", MeetingStore.Sanitize("a\\b*c?d\"e<f>g|h"));
+    }
+
+    [Fact]
     public void Rename_moves_file_and_refuses_conflicts()
     {
         var store = new MeetingStore(_dir);

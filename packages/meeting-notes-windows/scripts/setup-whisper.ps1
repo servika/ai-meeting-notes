@@ -18,6 +18,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Windows PowerShell 5.1 defaults to TLS 1.0/1.1; GitHub requires TLS 1.2.
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $root = Split-Path -Parent $PSScriptRoot
 $vendor = Join-Path $root "src/MeetingNotes.App/vendor"
 New-Item -ItemType Directory -Force -Path $vendor | Out-Null

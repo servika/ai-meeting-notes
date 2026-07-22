@@ -10,4 +10,4 @@ publish/
 *.msi
 
 # Bundled native binaries (whisper-cli.exe, models) - fetched/built, not committed
-vendor/
+vendor/scripts/Output/

@@ -29,14 +29,25 @@ public sealed class WhisperTranscriber(string whisperExePath)
         {
             "-m", modelPath, "-f", wavPath, "-l", language,
             "-oj", "-of", outBase, "--suppress-nst",
+            // Disable context conditioning to prevent repetition loops on long
+            // recordings (port of macOS 0.37.1 fix).
+            "-mc", "0",
         };
         await RunAsync(whisperExePath, args, ct);
 
-        if (!File.Exists(jsonPath)) return []; // no speech detected
+        if (!File.Exists(jsonPath))
+        {
+            // whisper-cli exited 0 but produced no JSON: treat the track as silent
+            // (no speech) and return no segments, matching the macOS app. A genuine
+            // failure is already surfaced by RunAsync throwing on a non-zero exit,
+            // so one silent track never fails the whole note.
+            return [];
+        }
         return Transcriber.ParseSegments(await File.ReadAllTextAsync(jsonPath, ct), speaker);
     }
 
-    private static async Task RunAsync(string exe, IReadOnlyList<string> args, CancellationToken ct)
+    /// <summary>Returns the process exit code.</summary>
+    private static async Task<int> RunAsync(string exe, IReadOnlyList<string> args, CancellationToken ct)
     {
         var psi = new ProcessStartInfo(exe)
         {
@@ -49,12 +60,22 @@ public sealed class WhisperTranscriber(string whisperExePath)
 
         using var proc = new Process { StartInfo = psi };
         proc.Start();
-        var stderr = await proc.StandardError.ReadToEndAsync(ct);
+
+        // Read stdout and stderr concurrently to prevent pipe-buffer deadlocks.
+        // whisper-cli writes progress/logs to both streams; if either fills the
+        // OS pipe buffer (~4 KB) while nobody is reading, the process blocks on
+        // write and WaitForExitAsync hangs forever.
+        var stdoutTask = proc.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = proc.StandardError.ReadToEndAsync(ct);
+        await Task.WhenAll(stdoutTask, stderrTask);
+
         await proc.WaitForExitAsync(ct);
         if (proc.ExitCode != 0)
         {
+            var stderr = await stderrTask;
             var tail = stderr.Length > 400 ? stderr[^400..] : stderr;
             throw new InvalidOperationException($"whisper-cli exited {proc.ExitCode}: {tail}");
         }
+        return proc.ExitCode;
     }
 }
