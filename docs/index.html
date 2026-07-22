@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Meeting Notes - record, transcribe & summarize meetings locally</title>
-<meta name="description" content="A macOS app that records meetings (your mic + everyone else's audio), then transcribes and summarizes them 100% locally. No cloud required, no virtual audio device.">
+<meta name="description" content="A macOS &amp; Windows app that records meetings (your mic + everyone else's audio), then transcribes and summarizes them 100% locally. No cloud required, no virtual audio device.">
 <style>
   :root{
     --indigo:#5c4cea; --purple:#9445d6; --ink:#1d1d2b; --muted:#5b5b6b;
@@ -53,15 +53,16 @@
 
 <header class="hero">
   <div class="wrap">
-    <span class="badge">macOS · 100% local · open source</span>
+    <span class="badge">macOS &amp; Windows · 100% local · open source</span>
     <h1>AI Meeting Notes</h1>
     <p class="tag">Record your meetings - your microphone <em>and</em> everyone else on the call - then transcribe and summarize them entirely on your machine. No cloud required. No virtual audio device.</p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/servika/ai-meeting-notes/releases/latest/download/AI-Meeting-Notes.dmg">Download for macOS<span id="latest-version"></span></a>
+      <a class="btn primary dl-macos" href="https://github.com/servika/ai-meeting-notes/releases/download/v0.38.1/AI-Meeting-Notes.dmg">Download for macOS<span class="ver-macos"></span></a>
+      <a class="btn primary dl-windows" href="https://github.com/servika/ai-meeting-notes/releases/download/win-v0.4.0/AI-Meeting-Notes-Setup.exe">Download for Windows<span class="ver-windows"></span></a>
       <a class="btn ghost" href="https://github.com/servika/ai-meeting-notes/blob/main/docs/MACOS-GUIDE.md">User guide</a>
       <a class="btn ghost" href="https://github.com/servika/ai-meeting-notes">View on GitHub</a>
     </div>
-    <p class="pill" style="color:rgba(255,255,255,.85);margin:14px 0 0">macOS 14.4+ (signed &amp; notarized) · Windows builds paused for now · <a style="color:#fff;text-decoration:underline" href="https://github.com/servika/ai-meeting-notes/releases/latest">all releases</a></p>
+    <p class="pill" style="color:rgba(255,255,255,.85);margin:14px 0 0">macOS 14.4+ (signed &amp; notarized) · Windows 10/11 x64 (unsigned beta - SmartScreen warns on first run) · <a style="color:#fff;text-decoration:underline" href="https://github.com/servika/ai-meeting-notes/releases">all releases</a></p>
   </div>
 </header>
 
@@ -101,7 +102,7 @@
   <div class="wrap">
     <h2>Requirements</h2>
     <ul>
-      <li><strong>macOS 14.4 or later</strong> (Apple Silicon recommended).</li>
+      <li><strong>macOS 14.4 or later</strong> (Apple Silicon recommended), <em>or</em> <strong>Windows 10/11 (x64)</strong> - the Windows build is self-contained (no .NET install needed).</li>
       <li>A <strong>whisper model</strong> - download one from inside the app (Settings → Transcription).</li>
       <li><strong>No extra installs</strong> - whisper.cpp is bundled inside the app.</li>
       <li><em>Optional, for summaries:</em> <a href="https://ollama.com">Ollama</a> (local) or a Claude API key.</li>
@@ -117,11 +118,11 @@
     <div class="grid">
       <div class="card">
         <h4>🍎 macOS</h4>
-        <p><a href="https://github.com/servika/ai-meeting-notes/releases/latest/download/AI-Meeting-Notes.dmg">Download the <code>.dmg</code></a>, open it, and drag <strong>AI Meeting Notes</strong> to Applications. It's signed &amp; notarized by Apple, so it opens with no Gatekeeper warning.</p>
+        <p><a class="dl-macos" href="https://github.com/servika/ai-meeting-notes/releases/download/v0.38.1/AI-Meeting-Notes.dmg">Download the <code>.dmg</code></a>, open it, and drag <strong>AI Meeting Notes</strong> to Applications. It's signed &amp; notarized by Apple, so it opens with no Gatekeeper warning.</p>
       </div>
       <div class="card">
-        <h4>🪟 Windows <span class="pill">paused</span></h4>
-        <p>Windows builds are on hold for now while the build environment is unavailable. The <a href="https://github.com/servika/ai-meeting-notes/tree/main/packages/meeting-notes-windows">code stays in the repo</a> and earlier <a href="https://github.com/servika/ai-meeting-notes/releases?q=win&amp;expanded=true">beta releases</a> remain downloadable, but aren't currently maintained.</p>
+        <h4>🪟 Windows <span class="pill">beta</span></h4>
+        <p><a class="dl-windows" href="https://github.com/servika/ai-meeting-notes/releases/download/win-v0.4.0/AI-Meeting-Notes-Setup.exe">Download the installer</a> (or the <a href="https://github.com/servika/ai-meeting-notes/releases?q=win&amp;expanded=true">portable zip</a>) and run it. It's not yet code-signed, so Windows SmartScreen shows a warning on first run - click <strong>More info → Run anyway</strong>.</p>
       </div>
     </div>
 
@@ -178,14 +179,31 @@ dotnet run --project src/MeetingNotes.App</code></pre>
 </footer>
 
 <script>
-	// Label the download button with the newest release. The button's URL always
-	// serves the latest DMG on its own, so any failure here (offline, API rate
-	// limit) just leaves the plain label rather than breaking the download.
-	fetch("https://api.github.com/repos/servika/ai-meeting-notes/releases/latest")
+	// Point each platform's download button at its own newest release and label
+	// it with the version. macOS and Windows ship as separate release series
+	// (v* and win-v*), so we can't use /releases/latest - it returns whichever
+	// was published last. The buttons already carry a working pinned URL, so any
+	// failure here (offline, API rate limit) just leaves those intact.
+	fetch("https://api.github.com/repos/servika/ai-meeting-notes/releases?per_page=30")
 		.then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-		.then(function (release) {
-			if (!release.tag_name) return;
-			document.getElementById("latest-version").textContent = " " + release.tag_name;
+		.then(function (releases) {
+			function newest(match) {
+				return releases.find(function (rel) {
+					return !rel.draft && !rel.prerelease && match.test(rel.tag_name || "");
+				});
+			}
+			function apply(rel, linkClass, verClass, asset) {
+				if (!rel) return;
+				document.querySelectorAll("." + verClass).forEach(function (s) {
+					s.textContent = " " + rel.tag_name;
+				});
+				var a = (rel.assets || []).find(function (x) { return asset.test(x.name); });
+				if (a) document.querySelectorAll("." + linkClass).forEach(function (el) {
+					el.href = a.browser_download_url;
+				});
+			}
+			apply(newest(/^v\d/), "dl-macos", "ver-macos", /\.dmg$/i);
+			apply(newest(/^win-v/), "dl-windows", "ver-windows", /Setup.*\.exe$/i);
 		})
 		.catch(function () {});
 </script>
