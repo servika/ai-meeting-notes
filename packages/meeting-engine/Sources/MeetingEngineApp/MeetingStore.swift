@@ -58,6 +58,18 @@ final class MeetingStore: ObservableObject {
 		(try? String(contentsOf: meeting.url, encoding: .utf8)) ?? ""
 	}
 
+	/// Replace the first top-level Markdown heading (`# …`) with `# title`, leaving
+	/// the rest of the note untouched. Returns the input unchanged if there's no
+	/// such heading (e.g. a note the user stripped it from).
+	static func replacingFirstHeading(in content: String, with title: String) -> String {
+		var lines = content.components(separatedBy: "\n")
+		for i in lines.indices where lines[i].hasPrefix("# ") {
+			lines[i] = "# \(title)"
+			return lines.joined(separator: "\n")
+		}
+		return content
+	}
+
 	/// Rename a meeting note's file. Audio stays linked via the note's frontmatter.
 	/// Returns the renamed Meeting (for reselection), or nil on no-op/failure.
 	@discardableResult
@@ -71,6 +83,13 @@ final class MeetingStore: ObservableObject {
 		let newURL = dir.appendingPathComponent(safe + ".md")
 		guard !FileManager.default.fileExists(atPath: newURL.path) else { return nil }
 		do { try FileManager.default.moveItem(at: meeting.url, to: newURL) } catch { return nil }
+		// Keep the note's `# H1` heading in step with the filename. Without this the
+		// body keeps the old title (e.g. "Meeting <stamp>"), which then leaks back
+		// into a re-generated note's title and makes duplicates hard to tell apart.
+		if let content = try? String(contentsOf: newURL, encoding: .utf8) {
+			let updated = Self.replacingFirstHeading(in: content, with: safe)
+			if updated != content { try? updated.write(to: newURL, atomically: true, encoding: .utf8) }
+		}
 		reload(folder: dir)
 		return meetings.first { $0.url == newURL }
 	}

@@ -14,6 +14,22 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.38.1] - 2026-07-22
+
+#### Fixed
+- **The "update available" bar no longer overlaps the meeting list and note.** It
+  was added as a safe-area inset on the split view, which floated it over the
+  content; it's now a proper row above the window so it pushes everything down.
+- **No more duplicate notes for one recording.** Renaming a meeting while it was
+  still recording (or processing) could leave you with two notes for the same
+  audio - one with the summary, one with only the transcript. Finalize now writes
+  back to the note it has been tracking for that recording, falling back to the
+  audio link only if needed, instead of spawning a fresh note when a re-scan
+  transiently missed the renamed placeholder.
+- **Renaming a note now updates its `# ` heading too.** The in-note title used to
+  keep the old "Meeting &lt;timestamp&gt;" text after a rename, which then leaked
+  into re-generated notes and made duplicates hard to tell apart.
+
 ### [0.38.0] - 2026-07-16
 
 #### Added
@@ -695,10 +711,56 @@ First release of the standalone macOS app.
 
 ## Windows app
 
-> ⏸️ **Builds paused (2026-07-17).** New Windows builds are temporarily on hold
-> while the build environment is unavailable. The source under
-> `packages/meeting-notes-windows` and the existing beta releases are unchanged;
-> this pause is expected to be reversible.
+### [0.4.0] - 2026-07-22
+
+#### Changed
+- **Redesigned the window to match the macOS app.** The sidebar is now a
+  searchable list of meetings with richer rows (icon, title, date) and pins the
+  Record panel - language picker, Record button, live level meters, and status -
+  to the bottom. The detail pane gained a prominent title, an icon toolbar (copy,
+  re-generate, trim, rename, delete), and a "no meeting selected" empty state.
+  Settings moved out of the always-open sidebar into a dedicated panel opened from
+  a gear button in the sidebar footer.
+
+### [0.3.1] - 2026-07-22
+
+#### Fixed
+- **Compressed/deleted audio no longer breaks the note's audio links.** When a
+  recording is compressed to M4A or removed after transcription, the note's embeds
+  are rewritten to match (they previously kept pointing at the now-missing `.wav`
+  files, or showed dead links instead of the "audio removed" note).
+- **A silent track no longer fails the whole note.** If one track has no speech
+  (you were muted, or nothing played through system audio), it's treated as "no
+  speech" and the other track still transcribes - matching the macOS app - instead
+  of failing note creation.
+- **Renaming a meeting updates the note's `#` heading too**, so the old
+  `Meeting <timestamp>` title no longer lingers in the body or leaks into a
+  re-generated note.
+- **The in-app player now stops at the end of playback**, and speed playback no
+  longer clicks or drops samples.
+- **The meeting detector no longer misses a meeting** that starts while the app is
+  still busy processing the previous one.
+- **A failure while stopping a recording can no longer crash the app** or leave the
+  UI stuck with the Record button disabled.
+- The update check is time-bounded (10s) and records its timestamp even on failure,
+  so a rate-limited or offline launch no longer re-hits GitHub every startup; the
+  installer now closes a running instance during in-place upgrades.
+
+### [0.3.0] - 2026-07-22
+
+#### Added
+- **In-app audio player** for recordings - play/pause, seek, and playback speed.
+- **Trim** a recording's trailing end and update its stored duration.
+- **Audio retention options** - compress recordings to M4A or delete them after
+  transcription to save space.
+- **Automatic meeting detection** - suggests recording when another app (Zoom,
+  Teams, Meet, …) starts using the microphone.
+- **Update checker** - notifies when a newer Windows build is published.
+
+#### Changed
+- **Dark Fluent theme.**
+- **Whisper: disable context conditioning (`-mc 0`)** to prevent repetition loops
+  on long recordings (port of the macOS 0.37.1 fix).
 
 ### [0.2.0] - 2026-06-25
 

@@ -16,7 +16,9 @@ struct ContentView: View {
 	}
 
 	var body: some View {
-		NavigationSplitView {
+		VStack(spacing: 0) {
+			updateBanner
+			NavigationSplitView {
 			VStack(spacing: 0) {
 				List(filteredMeetings, selection: $selection) { meeting in
 					MeetingRow(meeting: meeting)
@@ -47,7 +49,13 @@ struct ContentView: View {
 					status: controller.status,
 					eta: controller.remaining,
 					onRename: { newName in
-						if let renamed = store.rename(meeting, to: newName) { selection = renamed.id }
+						if let renamed = store.rename(meeting, to: newName) {
+							selection = renamed.id
+							// If we renamed the note of the in-progress/processing recording,
+							// keep the controller pointed at it so finalize writes there
+							// instead of creating a duplicate.
+							if controller.activeID == meeting.id { controller.activeID = renamed.id }
+						}
 					},
 					onRegenerate: { count in controller.regenerate(meeting, speakerCount: count) },
 					onCompress: { controller.compressAudio(meeting) },
@@ -73,7 +81,7 @@ struct ContentView: View {
 		.onChange(of: controller.activeID) {
 			if let id = controller.activeID { selection = id }
 		}
-		.safeAreaInset(edge: .top, spacing: 0) { updateBanner }
+		}
 	}
 
 	/// A slim "update available" bar at the top of the window. Empty (no space)

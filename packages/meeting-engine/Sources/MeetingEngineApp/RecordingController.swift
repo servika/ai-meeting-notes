@@ -99,6 +99,10 @@ final class RecordingController: ObservableObject {
 		status = "Finishing recording…"
 		startElapsedTimer()
 		let stamp = self.stamp
+		// The note we've been tracking for this recording since `start()`. It's
+		// updated through in-app renames (see MeetingStore.rename callers), so it
+		// stays valid even when the placeholder is renamed mid-recording.
+		let preferredPath = self.activeID
 		let token = CancelToken()
 		cancelToken = token
 		guard let meetingsDir = settings.meetingsDirURL else { busy = false; stopElapsedTimer(); return }
@@ -111,10 +115,12 @@ final class RecordingController: ObservableObject {
 			let estModel = self.settings.modelPath(for: self.settings.language.isEmpty ? "auto" : self.settings.language)
 			self.beginEstimate(audioSeconds: result.duration, model: estModel)
 			let audioBase = "recordings/Meeting \(stamp)"
-			// Follow a rename made during recording: find the placeholder note by
-			// its audio link rather than reconstructing the original filename, so
-			// we update that note instead of creating a duplicate.
-			let noteURL = Self.existingNoteURL(audioBase: audioBase, in: meetingsDir)
+			// Follow a rename made during recording so we update the placeholder note
+			// instead of creating a duplicate: prefer the note we've been tracking
+			// (`preferredPath`), then any note already linking this recording, and only
+			// then fall back to a fresh filename. Relying on the frontmatter re-scan
+			// alone let a transient miss spawn a second, notes-less note.
+			let noteURL = Self.targetNoteURL(preferredPath: preferredPath, audioBase: audioBase, in: meetingsDir)
 				?? meetingsDir.appendingPathComponent("Meeting \(stamp).md")
 			let title = noteURL.deletingPathExtension().lastPathComponent
 			// New recordings seed their speaker count from the current setting; it's
@@ -408,6 +414,22 @@ final class RecordingController: ObservableObject {
 			if frontmatterValue("audio", in: content) == audioBase { return url }
 		}
 		return nil
+	}
+
+	/// The note to write a finalized recording into. Prefers `preferredPath` (the
+	/// note the controller has tracked for this recording since `start()`) when it
+	/// still exists and links this recording, otherwise falls back to scanning for
+	/// any note that links the recording. Returns nil only when no note links it,
+	/// so the caller can create a fresh one. Trusting the tracked note first avoids
+	/// spawning a duplicate when a frontmatter re-scan transiently misses the
+	/// (possibly just-renamed) placeholder.
+	static func targetNoteURL(preferredPath: String?, audioBase: String, in dir: URL) -> URL? {
+		if let preferredPath, FileManager.default.fileExists(atPath: preferredPath) {
+			let url = URL(fileURLWithPath: preferredPath)
+			let content = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+			if frontmatterValue("audio", in: content) == audioBase { return url }
+		}
+		return existingNoteURL(audioBase: audioBase, in: dir)
 	}
 
 	/// Read a `key: value` line from a note's YAML frontmatter block.
