@@ -13,8 +13,8 @@ jobs:
       run:
         working-directory: packages/ai-meeting-notes
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "20.x"
       - run: npm ci
@@ -27,7 +27,7 @@ jobs:
       run:
         working-directory: packages/meeting-engine
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Toolchain versions
         run: swift --version && cmake --version
@@ -38,7 +38,7 @@ jobs:
       # whisper.cpp is compiled from a pinned source ref; cache the result so
       # only the first run (or a script change) pays the build cost.
       - name: Cache bundled whisper-cli
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             packages/meeting-engine/vendor
