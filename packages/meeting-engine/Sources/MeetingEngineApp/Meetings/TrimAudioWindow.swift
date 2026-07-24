@@ -13,6 +13,10 @@ struct TrimAudioWindow: View {
 	@Environment(\.dismiss) private var dismiss
 	// `dismiss` called from inside the confirmation dialog only closes the dialog,
 	// so the confirm action closes the whole window via `dismissWindow` instead.
+	// This is a value-based WindowGroup (`for: String.self`), so the dismiss must
+	// carry the same value the window was opened with - `dismissWindow(id:)` alone
+	// doesn't match it, which left the window open (with only Cancel live once
+	// `trimAudio` flipped `controller.busy`).
 	@Environment(\.dismissWindow) private var dismissWindow
 	@StateObject private var player = MeetingAudioPlayer()
 	@State private var cutTime: Double = 0
@@ -124,8 +128,8 @@ struct TrimAudioWindow: View {
 		.confirmationDialog("Trim this recording to \(timeLabel(cutTime))?", isPresented: $confirming) {
 			Button("Trim & Re-generate", role: .destructive) {
 				player.teardown()
+				dismissWindow(id: "audio-trim", value: meetingID)
 				controller.trimAudio(meeting, endSeconds: cutTime)
-				dismissWindow(id: "audio-trim")
 			}
 			Button("Cancel", role: .cancel) {}
 		} message: {

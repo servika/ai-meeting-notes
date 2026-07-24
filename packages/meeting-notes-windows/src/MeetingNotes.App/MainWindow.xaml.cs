@@ -40,6 +40,9 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private DateTime _processStart;
     private readonly DispatcherTimer _elapsedTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
+    // Auto-hides the "Settings saved" confirmation bar.
+    private DispatcherTimer? _settingsSavedTimer;
+
     // Audio player
     private AudioPlayer? _player;
     private bool _sliderDragging;
@@ -492,6 +495,9 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         ProgressPanel.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
         if (active)
         {
+            // Re-arm the Stop button for every run - OnCancelClick disables it, and
+            // without this it would stay greyed out on the second and later runs.
+            CancelButton.IsEnabled = true;
             ProcessingProgress.Value = 0;
             ProgressPercent.Text = "0%";
             ProgressElapsed.Text = "0s";
@@ -572,24 +578,34 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             : (int)(systemPath is not null ? AudioTrimmer.GetDurationSeconds(systemPath) : 0);
         if (currentDur <= 0) { StatusText.Text = "Cannot determine recording duration."; return; }
 
-        var input = ShowInputDialog("Trim recording",
-            $"Current duration: {FormatTime(currentDur)}\nKeep first N seconds:",
-            currentDur.ToString());
-        if (input is null || !int.TryParse(input, out var keepSeconds) || keepSeconds <= 0 || keepSeconds >= currentDur)
-            return;
+        // Don't let the detail-pane player and the trim preview play at once.
+        _player?.Pause();
+        PlayerPlayPause.Content = "▶";
+
+        var tracks = new List<string>();
+        if (systemPath is not null) tracks.Add(systemPath);
+        if (micPath is not null) tracks.Add(micPath);
+
+        var win = new TrimWindow(tracks, currentDur) { Owner = this };
+        if (win.ShowDialog() != true) return;
+
+        var startSeconds = win.StartSeconds;
+        var endSeconds = win.EndSeconds;
+        var keepSeconds = (int)Math.Round(endSeconds - startSeconds);
+        if (keepSeconds <= 0) return;
 
         StatusText.Text = $"Trimming to {FormatTime(keepSeconds)}…";
         var ok = true;
         await Task.Run(() =>
         {
-            if (systemPath is not null && !AudioTrimmer.TrimWav(systemPath, keepSeconds)) ok = false;
-            if (micPath is not null && !AudioTrimmer.TrimWav(micPath, keepSeconds)) ok = false;
+            if (systemPath is not null && !AudioTrimmer.TrimWav(systemPath, startSeconds, endSeconds)) ok = false;
+            if (micPath is not null && !AudioTrimmer.TrimWav(micPath, startSeconds, endSeconds)) ok = false;
         });
 
         if (!ok) { StatusText.Text = "Trim failed - recording may be in a compressed format."; return; }
 
         AudioTrimmer.UpdateFrontmatterDuration(m.Path, keepSeconds);
-        StatusText.Text = $"Trimmed. Re-generating transcript…";
+        StatusText.Text = "Trimmed. Re-generating transcript…";
 
         var reloadedContent = File.Exists(m.Path) ? File.ReadAllText(m.Path) : "";
         var reAudioBase = NoteFormat.FrontmatterValue("audio", reloadedContent) ?? audioBase;
@@ -790,8 +806,13 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
 
     private void OnDetailTabChanged(object sender, SelectionChangedEventArgs e) { }
 
-    private void OnOpenSettings(object sender, RoutedEventArgs e) =>
+    private void OnOpenSettings(object sender, RoutedEventArgs e)
+    {
+        _settingsSavedTimer?.Stop();
+        _settingsSavedTimer = null;
+        SettingsSavedBar.IsOpen = false;
         SettingsOverlay.Visibility = Visibility.Visible;
+    }
 
     private void OnCloseSettings(object sender, RoutedEventArgs e) =>
         SettingsOverlay.Visibility = Visibility.Collapsed;
@@ -936,7 +957,24 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
         File.WriteAllText(SettingsPath, JsonSerializer.Serialize(s));
         StatusText.Text = "Settings saved.";
+        ShowSettingsSaved();
         RefreshMeetings();
+    }
+
+    // Green in-pane confirmation that auto-fades after a few seconds, so a save is
+    // visible without hunting for the small status line by the level meters.
+    private void ShowSettingsSaved()
+    {
+        SettingsSavedBar.IsOpen = true;
+        _settingsSavedTimer?.Stop();
+        _settingsSavedTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _settingsSavedTimer.Tick += (_, _) =>
+        {
+            _settingsSavedTimer?.Stop();
+            _settingsSavedTimer = null;
+            SettingsSavedBar.IsOpen = false;
+        };
+        _settingsSavedTimer.Start();
     }
 
     private void LoadSettings()

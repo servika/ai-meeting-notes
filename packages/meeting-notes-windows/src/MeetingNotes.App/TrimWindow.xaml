@@ -1,0 +1,63 @@
+<ui:FluentWindow x:Class="MeetingNotes.App.TrimWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:MeetingNotes.App"
+        Title="Trim recording" Height="440" Width="640"
+        Icon="app.ico"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Trim recording" />
+
+        <StackPanel Grid.Row="1" Margin="20,4,20,20">
+            <TextBlock Text="Cut the recording to just the meeting - drag the green start and red end handles, listen with the player, then trim. Both tracks are shortened and the note is re-transcribed and summarized."
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       Margin="0,0,0,14" />
+
+            <local:WaveformTrimControl x:Name="Waveform" Height="88" Margin="0,0,0,4"
+                                       Cursor="Hand" />
+            <TextBlock Text="Loudness over time - dim bars are quiet. Click to seek playback; drag a handle to move the start or end of what you keep."
+                       FontSize="11" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                       Margin="0,0,0,10" />
+
+            <!-- Transport -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Center">
+                <ui:Button x:Name="PlayPause" Content="▶" Width="44" Click="OnPlayPause" />
+                <ui:Button Content="⏮" Width="44" Margin="6,0,0,0" Click="OnRestart"
+                           ToolTip="Back to start" />
+                <ui:Button Content="−15s" Width="52" Margin="6,0,0,0" Click="OnBack" />
+                <ui:Button Content="+15s" Width="52" Margin="6,0,0,0" Click="OnForward" />
+                <TextBlock x:Name="PositionText" Text="0:00" VerticalAlignment="Center"
+                           Margin="12,0,0,0" FontFamily="Consolas, monospace" />
+            </StackPanel>
+
+            <!-- Range + set-to-playhead -->
+            <Grid Margin="0,0,0,4">
+                <TextBlock x:Name="RangeText" VerticalAlignment="Center" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <ui:Button Content="Set start to playhead" Click="OnSetStart" />
+                    <ui:Button Content="Set end to playhead" Margin="6,0,0,0" Click="OnSetEnd" />
+                </StackPanel>
+            </Grid>
+            <TextBlock x:Name="RemovedText" FontSize="11"
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,2,0,0" />
+
+            <!-- Actions -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+                <ui:Button Content="Cancel" Width="90" Click="OnCancel" IsCancel="True" />
+                <ui:Button x:Name="TrimButton" Content="Trim &amp; Re-generate" Width="150"
+                           Margin="8,0,0,0" Appearance="Danger" Click="OnConfirm" />
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

@@ -14,6 +14,14 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.38.2] - 2026-07-24
+
+#### Fixed
+- **The Trim window now closes when you confirm a trim.** Confirming "Trim &
+  Re-generate" used to leave the window open with only Cancel usable; it now closes
+  and hands off to the meeting's normal processing bar. (The Trim window is a
+  value-based window, so its dismiss needs the meeting id to match.)
+
 ### [0.38.1] - 2026-07-22
 
 #### Fixed
@@ -710,6 +718,39 @@ First release of the standalone macOS app.
 ---
 
 ## Windows app
+
+### [0.5.0] - 2026-07-24
+
+#### Added
+- **Visual trim with start *and* end handles.** Trimming a recording now opens a
+  window with a loudness waveform: drag a green start handle and a red end handle to
+  choose exactly what to keep, preview with the player (click the waveform to seek,
+  or use "Set start/end to playhead"), then trim. Both the head and the tail can be
+  cut - the old flow only kept "the first N seconds" typed into a box. Both tracks
+  are shortened to the chosen range and the note is re-transcribed and summarized.
+
+### [0.4.3] - 2026-07-24
+
+#### Changed
+- **The installer now cleans a previous version before installing.** It carries a
+  stable app identity, so upgrades are recognised, the old version is uninstalled
+  silently first (no orphaned files from older builds), and it reinstalls into the
+  same folder. Your settings, downloaded models and notes are untouched - they live
+  outside the program folder - so an upgrade comes back fully configured.
+
+### [0.4.2] - 2026-07-24
+
+#### Added
+- **A green "Saved" confirmation appears in Settings when you save.** Saving
+  previously only updated the small status line by the level meters, which was easy
+  to miss; the Settings pane now shows a success bar that fades after a few seconds.
+
+### [0.4.1] - 2026-07-24
+
+#### Fixed
+- **The "Stop processing" button works on every run, not just the first.** After
+  cancelling once (or on the second and later recordings) the button stayed greyed
+  out; it is now re-enabled each time processing starts.
 
 ### [0.4.0] - 2026-07-22
 

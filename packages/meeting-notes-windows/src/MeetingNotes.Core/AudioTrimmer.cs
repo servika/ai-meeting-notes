@@ -12,9 +12,20 @@ public static class AudioTrimmer
     /// <paramref name="endSeconds"/> seconds. The file is replaced atomically.
     /// Returns false on failure (original is left untouched).
     /// </summary>
-    public static bool TrimWav(string wavPath, double endSeconds)
+    public static bool TrimWav(string wavPath, double endSeconds) =>
+        TrimWav(wavPath, 0, endSeconds);
+
+    /// <summary>
+    /// Trim <paramref name="wavPath"/> to keep only the audio between
+    /// <paramref name="startSeconds"/> and <paramref name="endSeconds"/> (a cut off
+    /// both the head and the tail). The file is replaced atomically. Returns false
+    /// on failure (original is left untouched).
+    /// </summary>
+    public static bool TrimWav(string wavPath, double startSeconds, double endSeconds)
     {
-        if (!File.Exists(wavPath) || endSeconds <= 0) return false;
+        if (!File.Exists(wavPath)) return false;
+        if (startSeconds < 0) startSeconds = 0;
+        if (endSeconds <= startSeconds) return false;
 
         var tmp = wavPath + ".trim.tmp";
         try
@@ -55,13 +66,16 @@ public static class AudioTrimmer
 
             if (sampleRate == 0 || dataStart == 0) return false;
 
-            var bytesPerSample = bitsPerSample / 8 * channels;
-            var keepSamples = (long)(endSeconds * sampleRate);
-            var keepBytes = (int)Math.Min(keepSamples * bytesPerSample, dataSize);
+            // Byte offsets stay frame-aligned because startFrame/endFrame are whole
+            // sample counts multiplied by the frame size.
+            var frameSize = bitsPerSample / 8 * channels;
+            var startByte = Math.Clamp((long)(startSeconds * sampleRate) * frameSize, 0, dataSize);
+            var endByte = Math.Clamp((long)(endSeconds * sampleRate) * frameSize, 0, dataSize);
+            var keepBytes = (int)(endByte - startByte);
+            if (keepBytes <= 0) return false;
+            if (startByte == 0 && endByte >= dataSize) return true; // whole file kept
 
-            if (keepBytes >= dataSize) return true; // nothing to trim
-
-            reader.BaseStream.Seek(dataStart, SeekOrigin.Begin);
+            reader.BaseStream.Seek(dataStart + startByte, SeekOrigin.Begin);
             var audioData = reader.ReadBytes(keepBytes);
             reader.Close();
 

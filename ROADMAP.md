@@ -51,6 +51,18 @@ the macOS app untouched. Full step-by-step plan: **[WINDOWS-PLAN.md](WINDOWS-PLA
   page has a Windows download. **Remaining: a real-hardware smoke-test** - the live
   WASAPI capture and WPF UI are CI-compiled but haven't run on Windows yet - then
   Authenticode signing (below).
+- **Installer: verify the clean-upgrade path on real hardware.** The installer now
+  carries a fixed `AppId`, `UsePreviousAppDir/Tasks`, and a `PrepareToInstall`
+  `[Code]` step that silently uninstalls a prior version before copying new files
+  (`scripts/installer.iss`) - but it's only been reviewed, not run (ISCC is
+  Windows-only, and this repo builds on macOS/CI). Remaining: on a real Windows box,
+  install an older build → install the next version → confirm settings, model path
+  and the vault all survive (they live in `%APPDATA%\MeetingNotes\` and the chosen
+  vault, outside `{app}`), and that no orphaned files remain in
+  `Program Files\AI Meeting Notes`. Also confirm the `unins000.exe` self-copy poll
+  actually waits long enough on a slow machine. Possible follow-up: a "remove my
+  settings and models too" checkbox on uninstall as an opt-in escape hatch.
+
 - **Authenticode signing + SmartScreen (the notarization analogue).**
   The release workflow already signs the published `.exe`s and the installer when
   six repo secrets are set (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`,
@@ -80,6 +92,13 @@ the macOS app untouched. Full step-by-step plan: **[WINDOWS-PLAN.md](WINDOWS-PLA
   would require swapping the signing steps in the workflow.
 
 ## UX polish
+
+- **macOS: add a start handle to the Trim window (match Windows).** The Windows app
+  now has a visual trim with both a start and an end handle
+  (`WaveformTrimControl` + `TrimWindow`), but the macOS `TrimAudioWindow` still cuts
+  the tail only (`cutTime`, "keeps the first …"). Follow-up: add a start marker to
+  `TrimWaveformView`/`TrimAudioWindow` and pass a start offset through
+  `RecordingController.trimAudio` so the head can be cut too.
 
 - **Don't show the Compress button while a meeting is still processing.**
   Compression is the last pipeline step (transcribe → summarize → compress), so on a
@@ -138,6 +157,25 @@ the macOS app untouched. Full step-by-step plan: **[WINDOWS-PLAN.md](WINDOWS-PLA
 
 See [CHANGELOG.md](CHANGELOG.md) for the full shipped history. Highlights:
 
+- ✅ **Windows: visual trim with start & end handles.** Shipped in Windows 0.5.0.
+  Trimming opens a window with a loudness waveform and a draggable green start /
+  red end handle, a preview transport, and "set to playhead" shortcuts - cutting
+  both the head and the tail, replacing the old "keep first N seconds" text prompt.
+  New `Waveform` (Audio), `WaveformTrimControl` + `TrimWindow` (App), and a
+  start+end `AudioTrimmer.TrimWav` overload (Core, unit-tested). macOS follow-up
+  (a start handle there too) is under UX polish.
+- ✅ **Windows: installer cleans the previous version, keeps config.** Shipped in
+  Windows 0.4.3. A fixed `AppId` + `UsePreviousAppDir/Tasks` + a `PrepareToInstall`
+  `[Code]` step silently uninstall a prior install before copying new files, so no
+  orphaned files linger; user settings/models/vault live outside `{app}` and
+  survive. Real-hardware verification still pending (under Windows app).
+- ✅ **Windows: settings-saved confirmation + reusable Stop button.** Shipped in
+  Windows 0.4.1/0.4.2. Saving Settings now shows a green auto-fading "Saved" bar,
+  and the "Stop processing" button re-arms on every run (it used to grey out after
+  the first cancel).
+- ✅ **macOS: Trim window closes on confirm.** Shipped in macOS 0.38.2. Confirming
+  "Trim & Re-generate" now dismisses the (value-based) window and hands off to the
+  meeting's processing bar, instead of leaving it open with only Cancel live.
 - ✅ **Developer ID signing + notarization + DMG.** Shipped (first signed release
   0.26.0). `scripts/make-dmg.sh --release` builds, signs with Developer ID,
   notarizes, staples, and publishes a GitHub release with the DMG - gated on
