@@ -1,3 +1,4 @@
+using MeetingNotes.Core;
 using NAudio.MediaFoundation;
 using NAudio.Wave;
 
@@ -12,33 +13,11 @@ public static class AudioCompressor
     /// <summary>
     /// Apply the audio retention policy to both tracks after transcription.
     /// Returns the resulting file extension ("wav", "m4a") or null if deleted.
+    /// The policy itself lives in <see cref="AudioRetention"/> (portable, and
+    /// therefore testable without Media Foundation); this supplies the encoder.
     /// </summary>
-    public static string? ApplyRetention(string systemWav, string micWav, string policy)
-    {
-        switch (policy)
-        {
-            case "delete":
-                TryDelete(systemWav);
-                TryDelete(micWav);
-                return null;
-
-            case "compressed":
-                var allOk = true;
-                foreach (var wav in new[] { systemWav, micWav })
-                {
-                    if (!File.Exists(wav)) continue;
-                    var m4a = Path.ChangeExtension(wav, ".m4a");
-                    if (CompressToM4A(wav, m4a))
-                        TryDelete(wav);
-                    else
-                        allOk = false;
-                }
-                return allOk ? "m4a" : "wav";
-
-            default: // "original"
-                return "wav";
-        }
-    }
+    public static string? ApplyRetention(string systemWav, string micWav, string policy) =>
+        AudioRetention.Apply(systemWav, micWav, policy, CompressToM4A);
 
     /// <summary>
     /// Compress a WAV file to AAC M4A at speech-quality bitrate.
@@ -46,8 +25,12 @@ public static class AudioCompressor
     /// </summary>
     public static bool CompressToM4A(string wavPath, string m4aPath)
     {
+        // Only the output we created ourselves may be cleaned up on failure - never
+        // a file that was already there, which could be the source recording.
+        var preexisting = File.Exists(m4aPath);
         try
         {
+            if (SamePath(wavPath, m4aPath)) return false;
             MediaFoundationApi.Startup();
             using var reader = new WaveFileReader(wavPath);
             MediaFoundationEncoder.EncodeToAac(reader, m4aPath);
@@ -55,10 +38,13 @@ public static class AudioCompressor
         }
         catch
         {
-            TryDelete(m4aPath);
+            if (!preexisting) TryDelete(m4aPath);
             return false;
         }
     }
+
+    private static bool SamePath(string a, string b) =>
+        string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
 
     private static void TryDelete(string path)
     {

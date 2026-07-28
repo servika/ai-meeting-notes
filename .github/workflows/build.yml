@@ -35,6 +35,9 @@ jobs:
       - name: Build Swift package
         run: swift build
 
+      - name: Unit tests
+        run: swift test
+
       # whisper.cpp is compiled from a pinned source ref; cache the result so
       # only the first run (or a script change) pays the build cost.
       - name: Cache bundled whisper-cli

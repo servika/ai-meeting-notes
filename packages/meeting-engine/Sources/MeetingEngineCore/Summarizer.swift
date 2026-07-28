@@ -56,7 +56,8 @@ public enum Summarizer {
 	}
 
 	/// Substitute the transcript/notes into a prompt (or append if no placeholder).
-	private static func fill(_ prompt: String, with text: String) -> String {
+	/// Internal rather than private so the tests can exercise it directly.
+	static func fill(_ prompt: String, with text: String) -> String {
 		prompt.contains("{{transcript}}")
 			? prompt.replacingOccurrences(of: "{{transcript}}", with: text)
 			: "\(prompt)\n\n\(text)"
@@ -80,7 +81,8 @@ public enum Summarizer {
 	}
 
 	/// Split text into <= maxChars chunks, breaking on blank lines where possible.
-	private static func chunkText(_ text: String, maxChars: Int) -> [String] {
+	/// Internal rather than private so the tests can exercise it directly.
+	static func chunkText(_ text: String, maxChars: Int) -> [String] {
 		var chunks: [String] = []
 		var current = ""
 		for para in text.components(separatedBy: "\n\n") {

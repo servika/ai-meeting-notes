@@ -379,7 +379,9 @@ final class RecordingController: ObservableObject {
 
 	/// `audioExt` is the extension of the kept tracks ("wav" or "m4a"), or nil when
 	/// the audio was deleted after transcription.
-	private static func buildNote(title: String, date: String, audioBase: String, durationSeconds: Int, speakerCount: Int = 0, summary: String, transcript: String, audioExt: String? = "wav", model: String = "") -> String {
+	/// Internal rather than private so the tests can pin the note format (it has to
+	/// stay byte-compatible with the Windows app - see NOTE-FORMAT.md).
+	static func buildNote(title: String, date: String, audioBase: String, durationSeconds: Int, speakerCount: Int = 0, summary: String, transcript: String, audioExt: String? = "wav", model: String = "") -> String {
 		let audioName = (audioBase as NSString).lastPathComponent
 		var s = "---\ntype: meeting\ntags: [meeting]\ndate: \(date)\naudio: \(audioBase)\n"
 		if durationSeconds > 0 { s += "duration: \(durationSeconds)\n" }

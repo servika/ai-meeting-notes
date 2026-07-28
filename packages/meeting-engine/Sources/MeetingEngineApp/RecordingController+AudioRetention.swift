@@ -15,23 +15,29 @@ extension RecordingController {
 			for p in [systemWav, micWav] { try? fm.removeItem(atPath: p) }
 			return nil
 		case "compressed":
-			var allOK = true
-			for wav in [systemWav, micWav] where fm.fileExists(atPath: wav) {
-				let m4a = (wav as NSString).deletingPathExtension + ".m4a"
-				if compressToM4A(wav: wav, m4a: m4a) {
-					try? fm.removeItem(atPath: wav)
-				} else {
-					allOK = false
-				}
+			for track in [systemWav, micWav] where isWAV(track) && fm.fileExists(atPath: track) {
+				// Only WAV tracks are encoded: a track that is already .m4a would
+				// otherwise be handed to afconvert as both input and output.
+				let m4a = (track as NSString).deletingPathExtension + ".m4a"
+				if compressToM4A(wav: track, m4a: m4a) { try? fm.removeItem(atPath: track) }
 			}
-			return allOK ? "m4a" : "wav" // fall back to keeping WAV if encoding failed
+			// Embed what actually survived: any track still on disk as WAV (encoding
+			// failed) keeps the note on .wav links rather than pointing at nothing.
+			let stillWAV = [systemWav, micWav].contains { isWAV($0) && fm.fileExists(atPath: $0) }
+			return stillWAV ? "wav" : "m4a"
 		default: // "original"
 			return "wav"
 		}
 	}
 
+	static func isWAV(_ path: String) -> Bool {
+		(path as NSString).pathExtension.lowercased() == "wav"
+	}
+
 	/// Transcode a WAV to a small AAC `.m4a` (speech-quality bitrate) via afconvert.
 	static func compressToM4A(wav: String, m4a: String) -> Bool {
+		// Encoding a file onto itself would destroy the only copy of the recording.
+		guard wav != m4a else { return false }
 		let p = Process()
 		p.executableURL = URL(fileURLWithPath: "/usr/bin/afconvert")
 		p.arguments = ["-f", "m4af", "-d", "aac", "-b", "48000", wav, m4a]

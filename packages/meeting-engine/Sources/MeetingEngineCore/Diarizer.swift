@@ -130,7 +130,10 @@ public enum Diarizer {
 	/// the `--` separator being present or absent and of extra log noise.
 	static func parseSpans(_ stdout: String) -> [SpeakerSpan] {
 		var spans: [SpeakerSpan] = []
-		for line in stdout.split(whereSeparator: { $0 == "\n" || $0 == "\r" }) {
+		// Split on newlines as scalars: "\r\n" is a *single* Swift Character, so a
+		// per-Character check would leave CRLF output as one merged line and parse
+		// the whole thing as one bogus span.
+		for line in stdout.components(separatedBy: .newlines) {
 			// e.g. "0.033 -- 2.041 speaker_00" (the "--" separator is optional).
 			let tokens = line.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
 			let nums = tokens.compactMap(Double.init)

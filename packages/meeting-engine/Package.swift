@@ -34,5 +34,14 @@ let package = Package(
 			name: "MeetingEngineApp",
 			dependencies: ["MeetingEngineCore"]
 		),
+		// Unit tests for the deterministic logic in both targets (transcript merge,
+		// note format, vault bookkeeping, audio retention/trim, settings). Anything
+		// needing real capture, whisper, or a summary engine stays out.
+		.testTarget(name: "MeetingEngineCoreTests", dependencies: ["MeetingEngineCore"]),
+		.testTarget(name: "MeetingEngineAppTests", dependencies: ["MeetingEngineApp"]),
+		// Whole-flow tests: real afconvert, a stub whisper CLI and a stub summary
+		// server, driving the shipping record/re-generate/trim paths over a temp vault.
+		.testTarget(name: "MeetingEngineIntegrationTests",
+			dependencies: ["MeetingEngineApp", "MeetingEngineCore"]),
 	]
 )
