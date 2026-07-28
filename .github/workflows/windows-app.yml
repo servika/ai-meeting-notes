@@ -31,3 +31,12 @@ jobs:
 
       - name: Test (Core)
         run: dotnet test tests/MeetingNotes.Core.Tests/MeetingNotes.Core.Tests.csproj -c Release --no-build --verbosity normal
+
+      # Audio retention/waveform tests: Media Foundation and NAudio's readers are
+      # Windows-only, so this suite can only run here.
+      - name: Test (Audio)
+        run: dotnet test tests/MeetingNotes.Audio.Tests/MeetingNotes.Audio.Tests.csproj -c Release --no-build --verbosity normal
+
+      # Whole-flow tests: stub whisper CLI + stub summary server over a temp vault.
+      - name: Test (Integration)
+        run: dotnet test tests/MeetingNotes.Integration.Tests/MeetingNotes.Integration.Tests.csproj -c Release --no-build --verbosity normal

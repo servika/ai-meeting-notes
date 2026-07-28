@@ -39,6 +39,11 @@ public sealed class MeetingPipeline(
         var summary = "";
         string? summaryWarning = null;
 
+        // Stop before doing any work if the user already hit Stop; the stages that
+        // shell out check the token themselves, but the cheap ones would otherwise
+        // run to completion and write a note after a cancellation.
+        ct.ThrowIfCancellationRequested();
+
         if (opts.Transcribe)
         {
             progress?.Report(new(0.05, "Transcribing microphone…"));
@@ -82,6 +87,7 @@ public sealed class MeetingPipeline(
             }
         }
 
+        ct.ThrowIfCancellationRequested();
         progress?.Report(new(0.98, "Saving note…"));
         var path = store.WriteNote(
             title, date, audioBase, durationSeconds, speakerCount,

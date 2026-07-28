@@ -248,6 +248,12 @@ public enum Transcriber {
 
 	private static func resolveBinary(_ name: String) -> String {
 		if name.hasPrefix("/") { return name }
+		// Dev/test override: run the pipeline against a specific whisper build (the
+		// integration tests point this at a stub CLI). Never set in normal use.
+		if let override = ProcessInfo.processInfo.environment["MEETING_ENGINE_WHISPER_BIN"],
+			!override.isEmpty {
+			return override
+		}
 		if let resources = Bundle.main.resourceURL {
 			let bundled = resources.appendingPathComponent(name).path
 			if FileManager.default.isExecutableFile(atPath: bundled) { return bundled }

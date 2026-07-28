@@ -14,6 +14,30 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.38.3] - 2026-07-28
+
+#### Fixed
+- **Speaker recognition no longer mis-parses output with Windows line endings.**
+  The diarizer's span parser split on single characters, but `\r\n` is one
+  character in Swift, so CRLF output collapsed into a single bogus speaker span.
+- **Compressing audio can never encode a track onto itself.** Already-compressed
+  `.m4a` tracks are skipped, and the encoder refuses a source/destination match -
+  the same class of defect that could delete Windows recordings.
+
+#### Added
+- **A unit-test suite for the app and the capture engine** (`swift test`, also run
+  in CI): transcript merge and cross-track echo removal, speaker-span parsing and
+  relabeling, summary chunking and engine guards, note format and frontmatter,
+  vault listing/rename/delete, audio retention, trimming, settings and feature
+  flags, and the processing-time estimator.
+- **Integration tests that run the real flows end to end** - re-generate, compress,
+  trim-then-re-generate, stop-in-flight - over a temporary vault, with only the
+  whisper CLI and the summary engine substituted (a real child process and a real
+  local HTTP server). Non-UI coverage is now 49%, with the recording controller at
+  59% and the transcription path at 89%.
+- **A release checklist** (`docs/RELEASE-CHECKLIST.md`) covering what no test can:
+  real capture, permissions, the menu bar, and cross-platform note compatibility.
+
 ### [0.38.2] - 2026-07-24
 
 #### Fixed
@@ -718,6 +742,44 @@ First release of the standalone macOS app.
 ---
 
 ## Windows app
+
+### [0.5.1] - 2026-07-27
+
+#### Fixed
+- **Re-generating or trimming an already-compressed meeting no longer deletes its
+  audio.** With audio retention set to "Compress (M4A)", running the pipeline again
+  on a meeting whose tracks were already converted made the compressor try to encode
+  each `.m4a` onto itself: the WAV reader rejected the file and the failure cleanup
+  removed it, wiping both tracks. Already-compressed tracks are now skipped, the
+  encoder refuses to write onto its own source, and failure cleanup only ever removes
+  a file it created itself.
+- **The Summary pane no longer repeats the meeting title.** Reading a note's summary
+  started from the top of the body instead of the first `## ` heading, so the `# Title`
+  line was shown as part of the summary (and a note with no summary showed just the
+  title).
+- **Stopping a run now stops it even between stages.** The pipeline only checked for
+  cancellation inside the steps that shell out, so a cancelled run could still write
+  its note; it now checks before starting and before saving.
+
+#### Added
+- **Unit tests for the audio and pipeline paths.** A new `MeetingNotes.Audio.Tests`
+  suite (Windows/CI only - Media Foundation) covers the retention policy and the trim
+  waveform, and the Core suite gains coverage for the note sections, the pipeline,
+  duration bookkeeping, the summary-engine guards, and version comparison.
+- **Integration tests for the whole flow** (`MeetingNotes.Integration.Tests`): a
+  recording goes through the real pipeline - launch whisper, parse its JSON, merge
+  the tracks, POST to the summary engine, write the note, apply retention, rewrite
+  the embeds - with only the model and the LLM substituted (a real child process and
+  a real local HTTP server). Includes the compress → re-generate → trim lifecycle
+  that lost audio in 0.5.0. Core coverage is now 84%.
+- **A release checklist** (`docs/RELEASE-CHECKLIST.md`) covering what no test can:
+  the installer, real capture devices, the tray, and cross-platform note compatibility.
+
+#### Changed
+- **The audio-retention step moved into Core** (`AudioRetention`), with the Windows-only
+  encoder injected. The policy, the track lookup and the note rewrite the app runs are
+  now the same code the tests drive, instead of living inside the window class where
+  nothing could reach them.
 
 ### [0.5.0] - 2026-07-24
 

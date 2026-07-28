@@ -118,12 +118,17 @@ public static class NoteFormat
     public static string ExtractSummary(string content)
     {
         var body = StripFrontmatter(content);
-        var idx = body.IndexOf("\n## Transcript", StringComparison.Ordinal);
-        if (idx >= 0) body = body[..idx];
-        // Skip the "# Title" heading
-        var headingEnd = body.IndexOf('\n');
-        if (headingEnd >= 0) body = body[(headingEnd + 1)..];
-        return body.Trim();
+        // Cut off everything after the summary. A note whose transcript section is
+        // missing still has an Audio section to stop at.
+        foreach (var marker in new[] { "\n## Transcript", "\n## Audio" })
+        {
+            var idx = body.IndexOf(marker, StringComparison.Ordinal);
+            if (idx >= 0) { body = body[..idx]; break; }
+        }
+        // Start at the first "## " heading, which skips the leading "# Title" line;
+        // a note with no summary sections has nothing to extract.
+        var start = body.IndexOf("## ", StringComparison.Ordinal);
+        return start < 0 ? "" : body[start..].Trim();
     }
 
     /// <summary>Extract just the Transcript section body.</summary>

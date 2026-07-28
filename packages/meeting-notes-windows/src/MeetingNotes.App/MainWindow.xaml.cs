@@ -448,16 +448,11 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             if (opts.Transcribe && opts.AudioRetention != "original")
             {
                 StatusText.Text = "Optimizing audio…";
-                var newExt = await Task.Run(() => AudioCompressor.ApplyRetention(systemWav, micWav, opts.AudioRetention));
-                if (File.Exists(result.NotePath))
+                await Task.Run(() =>
                 {
-                    var audioName = audioBase.Contains('/')
-                        ? audioBase[(audioBase.LastIndexOf('/') + 1)..]
-                        : audioBase;
-                    var rewritten = NoteFormat.RewriteAudioSection(
-                        await File.ReadAllTextAsync(result.NotePath), audioName, newExt);
-                    await File.WriteAllTextAsync(result.NotePath, rewritten);
-                }
+                    var newExt = AudioCompressor.ApplyRetention(systemWav, micWav, opts.AudioRetention);
+                    AudioRetention.RewriteNote(result.NotePath, audioBase, newExt);
+                });
             }
 
             var msg = "Done.";
@@ -613,19 +608,8 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     }
 
     /// <summary>Find audio tracks (system + mic) for a meeting, trying WAV then M4A.</summary>
-    private static (string? system, string? mic) FindAudioTracks(string dir, string audioBase)
-    {
-        string? sys = null, mic = null;
-        var rel = audioBase.Replace('/', Path.DirectorySeparatorChar);
-        foreach (var ext in new[] { "wav", "m4a" })
-        {
-            var s = Path.Combine(dir, rel + ".system." + ext);
-            var m = Path.Combine(dir, rel + ".mic." + ext);
-            if (sys is null && File.Exists(s)) sys = s;
-            if (mic is null && File.Exists(m)) mic = m;
-        }
-        return (sys, mic);
-    }
+    private static (string? system, string? mic) FindAudioTracks(string dir, string audioBase) =>
+        AudioRetention.FindTracks(dir, audioBase);
 
     // ---- rename ----
 
