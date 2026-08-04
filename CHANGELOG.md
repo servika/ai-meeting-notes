@@ -743,6 +743,54 @@ First release of the standalone macOS app.
 
 ## Windows app
 
+### [0.6.0] - 2026-08-04
+
+#### Fixed
+- **Stopping a long recording no longer hangs on "Stopping…" forever.** Stopping
+  waited unconditionally for each capture's `RecordingStopped` event, but a capture
+  whose device had already gone away (headset reconnecting, another app switching the
+  default endpoint, resume from sleep) had ended its thread long before and would
+  never raise that event again - the app waited on it for good, with **Stop & Process**
+  greyed out and no way back except a restart. Stopping now skips a capture already
+  known to be dead and, for anything else, gives up after 5 seconds and keeps the
+  audio. The same fix covers the second half of the symptom: a dead device stops
+  feeding level meters, so the silence watchdog fired after 5 minutes and walked
+  straight into the hang.
+- **The window no longer freezes while a long recording is converted.** Resampling
+  both tracks to whisper's 16 kHz ran on the UI thread - well over a minute for a long
+  meeting, which Windows paints as "Not Responding". It now runs off the UI thread
+  behind a "Converting audio…" status.
+- **A track that cannot be resampled no longer costs the other one.** One unreadable
+  capture file is logged and skipped instead of failing the whole stop.
+- **A very long recording no longer destroys its own audio.** Tracks are held in the
+  device's format until the recording stops (system audio ≈ 1.4 GB/hour), and a WAV's
+  RIFF header cannot address past 4 GiB - so the file silently became unreadable
+  somewhere in the third hour. The only guard was a 4-hour cap that arrived *after*
+  that point and, being part of the auto-stop option, did not apply at all when
+  auto-stop was switched off. Recording now stops at a safe margin below the format's
+  limit and at the 4-hour mark whatever the auto-stop setting says, with a one-time
+  warning ("stops automatically in about N min") beforehand.
+- **Stop can only run once.** Button, tray, watchdog, sleep and screen-lock could all
+  fire a stop at the same recorder; a second entry now returns immediately instead of
+  running against a disposed capture.
+
+#### Added
+- **Devices that drop out mid-meeting are detected and reported.** When a capture
+  ends unexpectedly the recorder makes one attempt to reconnect it into the same
+  track (possible when the new endpoint's format matches) and shows a banner plus a
+  toast either way - so a dead microphone surfaces during the meeting instead of as
+  an empty transcript afterwards. If both tracks are gone, the recording stops and
+  saves what was captured, whatever the auto-stop setting says.
+- **Auto-stop tells silence apart from a stalled device.** A live mic delivers
+  buffers even in a quiet room, so "no audio from the capture device for N minutes"
+  and "silent for N minutes" are now reported as the different problems they are.
+- **An opt-in diagnostic log** (Settings → "Write diagnostic log", **off by default**).
+  Records device formats, capture losses and restarts, stop and resample steps,
+  pipeline stages and every caught exception - no audio, no transcript, no note
+  contents - to `%APPDATA%/MeetingNotes/logs/`, self-rotating with one backup (~4 MB
+  cap). **Open log folder** and **Clear log** sit next to the checkbox. Until now a
+  remote user's problem left no trace at all.
+
 ### [0.5.1] - 2026-07-27
 
 #### Fixed

@@ -29,6 +29,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private readonly HttpClient _http = new() { Timeout = Timeout.InfiniteTimeSpan };
     private MeetingRecorder? _recorder;
     private bool _recording;
+    private bool _stopping;   // a stop is already in flight; ignore further stop requests
     private bool _processing;
     private string _audioBase = "";
     private string _outBase = "";
@@ -55,6 +56,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private DispatcherTimer? _autoStopTimer;
     private DateTime _lastSound = DateTime.Now;
     private const float SilenceLevel = 0.02f;
+    private bool _limitWarned;   // the "nearing the WAV limit" notice fires once per recording
 
     // Update checker
     private readonly UpdateChecker _updateChecker = new();
@@ -158,6 +160,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private void StartAutoStopWatchdog()
     {
         _lastSound = DateTime.Now;
+        _limitWarned = false;
         _autoStopTimer?.Stop();
         _autoStopTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _autoStopTimer.Tick += (_, _) => AutoStopTick();
@@ -172,25 +175,76 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
 
     private void AutoStopTick()
     {
-        if (!_recording || AutoStopCheck.IsChecked != true) return;
+        if (!_recording || _stopping) return;
         var now = DateTime.Now;
-        if (Math.Max(SystemLevel.Value, MicLevel.Value) > SilenceLevel)
-            _lastSound = now;
+        var recorder = _recorder;
 
-        if ((now - _recordStart).TotalHours >= 4)
+        // Dead devices are not silence. Once nothing is being captured the recording
+        // can only grow as an empty file, so stop and keep what we have - regardless
+        // of the auto-stop setting, which is about forgotten recordings, not broken
+        // ones.
+        if (recorder is not null && !recorder.SystemAlive && !recorder.MicAlive)
         {
-            AutoStop("4-hour limit reached");
+            AutoStop("audio devices stopped - nothing was being captured");
             return;
         }
 
+        // Size and duration ceilings apply whether or not auto-stop is on: past them
+        // a recording corrupts its own WAV (see RecordingLimits), which is not a
+        // preference the user gets to switch off.
+        if (recorder is not null && CheckRecordingLimits(recorder, now - _recordStart)) return;
+
+        if (AutoStopCheck.IsChecked != true) return;
+
+        if (Math.Max(SystemLevel.Value, MicLevel.Value) > SilenceLevel)
+            _lastSound = now;
+
         if (!int.TryParse(AutoStopMinutesBox.Text, out var mins)) mins = 5;
         if ((now - _lastSound).TotalMinutes >= Math.Max(1, mins))
-            AutoStop($"silent for {mins} minutes");
+        {
+            // A live mic delivers buffers even in a silent room. If none arrived for
+            // a while, this is a device that went quiet, not a meeting that did - say
+            // so, because the two need different fixes from the user.
+            var stalled = recorder is { MicAlive: true } && recorder.SecondsSinceData > 30;
+            AutoStop(stalled
+                ? $"no audio from the capture device for {mins} minutes"
+                : $"silent for {mins} minutes");
+        }
+    }
+
+    /// <summary>
+    /// Stop (or warn once) when the recording nears the WAV size or duration ceiling.
+    /// Returns true when the recording was stopped.
+    /// </summary>
+    private bool CheckRecordingLimits(MeetingRecorder recorder, TimeSpan elapsed)
+    {
+        var bytes = recorder.MaxTrackBytes;
+        var limit = RecordingLimits.Check(bytes, elapsed);
+
+        if (limit.State == RecordingLimitState.Stop)
+        {
+            AutoStop($"the recording {limit.Reason} - saved everything up to here");
+            return true;
+        }
+
+        if (limit.State == RecordingLimitState.Warning && !_limitWarned)
+        {
+            _limitWarned = true;
+            var left = RecordingLimits.SecondsUntilByteLimit(bytes, elapsed);
+            var eta = left is { } s
+                ? $" It will stop automatically in about {Math.Max(1, Math.Round(s / 60))} min."
+                : " It will stop automatically soon.";
+            DiagnosticLog.Write($"limits: warning - {limit.Reason}, {bytes / 1_048_576} MB written");
+            StatusText.Text = $"⚠ This recording is {limit.Reason}.{eta}";
+            ShowToast("Long recording", $"This recording is {limit.Reason}.{eta}");
+        }
+        return false;
     }
 
     private async void AutoStop(string reason)
     {
-        if (!_recording) return;
+        if (!_recording || _stopping) return;
+        DiagnosticLog.Write($"auto-stop: {reason}");
         StatusText.Text = $"Auto-stopped ({reason}). Processing…";
         ShowToast("Recording auto-stopped", reason);
         await StopAndProcessAsync();
@@ -317,6 +371,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
 
         _detector.Clear();
         DetectedBanner.Visibility = Visibility.Collapsed;
+        CaptureLostBanner.Visibility = Visibility.Collapsed;
 
         var name = "Meeting " + DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
         _recordStart = DateTime.Now;
@@ -330,6 +385,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             SystemLevel.Value = sys;
             MicLevel.Value = mic;
         });
+        _recorder.CaptureLost += loss => Dispatcher.Invoke(() => OnCaptureLost(loss));
         try
         {
             var micId = MicPicker.SelectedValue as string;
@@ -337,26 +393,48 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         }
         catch (Exception ex)
         {
+            DiagnosticLog.Exception("record: start", ex);
             StatusText.Text = "Couldn't start recording: " + ex.Message;
             _recorder.Dispose();
             _recorder = null;
             return;
         }
+        DiagnosticLog.Write($"record: started \"{name}\"");
         _recording = true;
+        _stopping = false;
         RecordButton.Content = "■ Stop & Process";
         StatusText.Text = "Recording…";
         StartAutoStopWatchdog();
         UpdateTrayIcon();
     }
 
+    // A recording track died mid-meeting. The recorder already tried to reconnect it;
+    // either way the user finds out now instead of discovering an empty note later.
+    private void OnCaptureLost(CaptureLoss loss)
+    {
+        CaptureLostText.Text = loss.Message;
+        CaptureLostBanner.Visibility = Visibility.Visible;
+        ShowToast(loss.Recovered ? "Audio device reconnected" : "Audio device lost", loss.Message);
+        if (!loss.Recovered && _recording) StatusText.Text = $"⚠ {loss.Track} capture stopped.";
+    }
+
+    private void OnDismissCaptureLost(object sender, RoutedEventArgs e) =>
+        CaptureLostBanner.Visibility = Visibility.Collapsed;
+
     private async Task StopAndProcessAsync()
     {
+        // Stop can arrive from the button, the tray, the watchdog, sleep and lock at
+        // once; without this a second entry would run against a disposed recorder.
+        if (_stopping || _recorder is null) return;
+        _stopping = true;
+
         StopAutoStopWatchdog();
         RecordButton.IsEnabled = false;
         StatusText.Text = "Stopping…";
         try
         {
-            var result = await _recorder!.StopAsync();
+            var stage = new Progress<string>(s => StatusText.Text = s);
+            var result = await _recorder!.StopAsync(stage);
             _recorder.Dispose();
             _recorder = null;
             _recording = false;
@@ -375,14 +453,21 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             // Never let a stop/dispose failure escape onto the async-void caller
             // (process crash) or leave the UI stuck non-recording with a disabled
             // button.
+            DiagnosticLog.Exception("record: stop", ex);
             _recorder?.Dispose();
             _recorder = null;
             _recording = false;
             SystemLevel.Value = MicLevel.Value = 0;
             RecordButton.Content = "● Record";
-            RecordButton.IsEnabled = true;
             UpdateTrayIcon();
             StatusText.Text = "Stop failed: " + ex.Message;
+        }
+        finally
+        {
+            _stopping = false;
+            // Last line of defence for the symptom this fixes: whatever happened
+            // above, the user can always record again.
+            if (!_processing) RecordButton.IsEnabled = true;
         }
     }
 
@@ -402,8 +487,17 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         _elapsedTimer.Start();
         UpdateTrayIcon();
 
+        DiagnosticLog.Write($"pipeline: start \"{title}\", {duration}s, "
+            + $"system={Path.GetFileName(systemWav)} mic={Path.GetFileName(micWav)}");
+
+        var lastLoggedStatus = "";
         var progress = new Progress<PipelineProgress>(p =>
         {
+            if (p.Status != lastLoggedStatus)
+            {
+                lastLoggedStatus = p.Status;
+                DiagnosticLog.Write($"pipeline: {(int)(p.Fraction * 100)}% {p.Status}");
+            }
             _lastProgressPercent = (int)(p.Fraction * 100);
             ProcessingProgress.Value = _lastProgressPercent;
             ProgressPercent.Text = $"{_lastProgressPercent}%";
@@ -460,6 +554,8 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             else if (opts.AudioRetention == "compressed") msg += " Audio compressed.";
             else if (opts.AudioRetention == "delete") msg += " Audio removed.";
             if (micWarning is not null) msg += "  ⚠ " + micWarning;
+            DiagnosticLog.Write($"pipeline: done → {result.NotePath}"
+                + (result.SummaryWarning is null ? "" : $" ({result.SummaryWarning})"));
             StatusText.Text = msg;
             ShowToast("Meeting processed", title);
             RefreshMeetings();
@@ -467,10 +563,12 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         }
         catch (OperationCanceledException)
         {
+            DiagnosticLog.Write("pipeline: cancelled by user");
             StatusText.Text = "Cancelled.";
         }
         catch (Exception ex)
         {
+            DiagnosticLog.Exception("pipeline", ex);
             StatusText.Text = "Processing failed: " + ex.Message;
         }
         finally
@@ -927,7 +1025,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         int Engine = 0, string OllamaUrl = "http://localhost:11434", string OllamaModel = "qwen2.5:7b",
         string ClaudeModel = "claude-opus-4-8", string MicDeviceId = "", int Theme = 0,
         int AudioRetention = 0, bool AutoStop = true, int AutoStopMinutes = 5,
-        bool DetectMeetings = true, string CustomPrompt = "");
+        bool DetectMeetings = true, string CustomPrompt = "", bool DiagnosticLog = false);
 
     private void OnSaveSettings(object sender, RoutedEventArgs e)
     {
@@ -937,7 +1035,8 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             (MicPicker.SelectedValue as string) ?? "", ThemeBox.SelectedIndex,
             AudioRetentionBox.SelectedIndex, AutoStopCheck.IsChecked == true,
             int.TryParse(AutoStopMinutesBox.Text, out var m) ? m : 5,
-            DetectMeetingsCheck.IsChecked == true, PromptBox.Text);
+            DetectMeetingsCheck.IsChecked == true, PromptBox.Text,
+            DiagnosticLogCheck.IsChecked == true);
         Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
         File.WriteAllText(SettingsPath, JsonSerializer.Serialize(s));
         StatusText.Text = "Settings saved.";
@@ -983,5 +1082,39 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         AutoStopMinutesBox.Text = s.AutoStopMinutes.ToString();
         DetectMeetingsCheck.IsChecked = s.DetectMeetings;
         PromptBox.Text = s.CustomPrompt;
+        DiagnosticLogCheck.IsChecked = s.DiagnosticLog;
+        ApplyDiagnosticLogSetting();
+    }
+
+    // ---- diagnostic log ----
+
+    private void ApplyDiagnosticLogSetting()
+    {
+        var on = DiagnosticLogCheck.IsChecked == true;
+        var wasOn = DiagnosticLog.Enabled;
+        DiagnosticLog.Enabled = on;
+        // Every switch-on starts a self-describing block, so a log the user sends
+        // over says which build and which Windows produced it.
+        if (on && !wasOn) DiagnosticLog.WriteSessionHeader(AppVersion);
+    }
+
+    private void OnDiagnosticLogToggled(object sender, RoutedEventArgs e)
+        => ApplyDiagnosticLogSetting();
+
+    private void OnOpenLogFolder(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(DiagnosticLog.Folder);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                DiagnosticLog.Folder) { UseShellExecute = true });
+        }
+        catch (Exception ex) { StatusText.Text = "Couldn't open the log folder: " + ex.Message; }
+    }
+
+    private void OnClearLog(object sender, RoutedEventArgs e)
+    {
+        DiagnosticLog.Clear();
+        StatusText.Text = "Diagnostic log cleared.";
     }
 }

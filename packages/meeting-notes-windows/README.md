@@ -42,6 +42,27 @@ The app needs `whisper-cli.exe` and a ggml model (`.bin`):
   (downloads the latest whisper.cpp Windows binary into `src/MeetingNotes.App/vendor/`,
   copied next to the app on build and auto-resolved). Or Browse to your own copy.
 
+## Troubleshooting
+
+Settings → **Write diagnostic log** (off by default) records what the app does with
+your capture devices and each pipeline stage - no audio, no transcript, no note
+contents. It lands in `%APPDATA%/MeetingNotes/logs/meeting-notes.log` (self-rotating,
+capped at ~4 MB); **Open log folder** and **Clear log** sit next to the checkbox.
+Turn it on, reproduce the problem, and attach the file to a bug report.
+
+Recording-specific notes:
+
+- A capture device that drops out mid-meeting (Bluetooth headset reconnecting, a
+  call app switching the default endpoint, resume from sleep) is detected: the app
+  tries to reconnect the track automatically and shows a banner either way. If
+  neither track can be captured, the recording stops and keeps what it has.
+- Auto-stop distinguishes "nobody spoke" from "the device stopped sending audio"
+  and says which one it was.
+- Recording stops on its own near the WAV format's 4 GB ceiling (roughly 2¾ hours of
+  system audio) and at 4 hours, warning once beforehand. These ceilings are not part
+  of the auto-stop option - past them the file becomes unreadable, so they hold even
+  with auto-stop switched off.
+
 ## Release
 
 Local packaging (self-contained zip, + an installer if Inno Setup is on PATH):

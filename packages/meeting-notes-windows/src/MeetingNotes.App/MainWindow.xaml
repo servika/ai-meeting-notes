@@ -59,6 +59,18 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Capture device dropped out mid-recording -->
+                        <Border x:Name="CaptureLostBanner" Visibility="Collapsed"
+                                Background="#22FF3B30" CornerRadius="8" Padding="10" Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock Text="⚠ Audio device dropped out" FontWeight="SemiBold" FontSize="12" />
+                                <TextBlock x:Name="CaptureLostText" FontSize="11" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <ui:Button Content="Dismiss" Margin="0,6,0,0" Click="OnDismissCaptureLost"
+                                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
                         <!-- Language (kept next to Record, like macOS) -->
                         <DockPanel Margin="0,0,0,8">
                             <TextBlock DockPanel.Dock="Left" Style="{StaticResource Glyph}" Text="&#xE774;"
@@ -405,6 +417,16 @@
                                     <ui:TextBox x:Name="AutoStopMinutesBox" Text="5" Width="50" Margin="6,0,0,0" />
                                 </DockPanel>
                                 <CheckBox x:Name="DetectMeetingsCheck" Content="Detect meetings (mic usage)" IsChecked="True" Margin="0,6,0,0" />
+
+                                <CheckBox x:Name="DiagnosticLogCheck" Content="Write diagnostic log" IsChecked="False"
+                                          Margin="0,10,0,0" Checked="OnDiagnosticLogToggled" Unchecked="OnDiagnosticLogToggled" />
+                                <TextBlock Margin="20,2,0,0" FontSize="11" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Text="Off by default. Records what the app does with your devices and the pipeline (no audio, no transcript) so a problem can be diagnosed." />
+                                <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
+                                    <ui:Button Content="Open log folder" Click="OnOpenLogFolder" />
+                                    <ui:Button Content="Clear log" Margin="6,0,0,0" Click="OnClearLog" />
+                                </StackPanel>
 
                                 <TextBlock Text="Summary prompt" Margin="0,10,0,2" />
                                 <ui:TextBox x:Name="PromptBox" AcceptsReturn="True" TextWrapping="Wrap"
