@@ -146,6 +146,45 @@ the macOS app untouched. Full step-by-step plan: **[WINDOWS-PLAN.md](WINDOWS-PLA
   embedding model (wespeaker over-split least in testing), and fold the mic
   "You" track into the embedding space so a remote echo of the user isn't
   counted as a separate "Them".
+- **Live transcription during the meeting + chat with the running notes.**
+  Today the pipeline is strictly post-hoc: stop → transcribe → summarize → note.
+  The next capture-level step is showing the transcript *as the meeting happens*,
+  and letting the user ask questions against it mid-meeting ("what did they commit
+  to?", "summarize the last 10 minutes", "did we decide on the deadline?").
+  Two halves, and the first gates the second:
+  - **Streaming ASR.** whisper.cpp large-v3 can't do this - it's a batch,
+    30-second-window model and takes minutes on a long file. The candidate is
+    **[Moonshine v2](https://github.com/moonshine-ai/moonshine-v2)** (streaming
+    ASR for edge devices): flexible input windows instead of Whisper's fixed
+    30s zero-padded one, plus a streaming cache that reuses prior compute as
+    audio arrives - ~73-107ms latency CPU-only on a MacBook, against seconds
+    for Whisper. Runs on both tracks (mic + system loopback), so the You/Them
+    split we already have carries over.
+    Two caveats to settle before committing:
+    1. **Licensing.** English models are MIT; **all non-English models
+       (Ukrainian included) are under the non-commercial Moonshine Community
+       License** - a blocker for a paid/commercial build, needs a direct
+       agreement with Moonshine AI. Alternatives to evaluate if that fails:
+       `whisper-streaming`/WhisperLive over a small whisper model, or
+       Apple's on-device `SpeechAnalyzer` (macOS 26+).
+    2. **Quality.** Moonshine tops out at ~200M params vs large-v3's 1.5B, and
+       its models are per-language - so uk/en code-switching, common on our
+       meetings, likely degrades. Also unclear how it handles a 40-minute
+       session (docs recommend staying under ~30s of input per call, i.e. we'd
+       own the VAD chunking).
+    **Therefore: live ASR is a draft, not a replacement.** Keep whisper large-v3
+    as the authoritative pass after the meeting ends; the streaming transcript is
+    a real-time view that gets overwritten by the final one. Benchmark both on
+    the real Ukrainian recordings in `input/` before any of this is committed to.
+  - **In-meeting chat.** A side panel over the live transcript buffer - the same
+    Ollama/Claude engines and prompt machinery the summary already uses, but with
+    the running transcript as context instead of a finished one. Short meetings
+    fit a context window whole; longer ones reuse the map-reduce chunking. This is
+    the real-time sibling of **Chat over meetings (RAG)** under Postponed (which
+    queries the finished archive) - shared retrieval/prompt layer, so worth
+    designing the two together.
+  Gate behind `experimentalMode` like diarization, and expect it to land Windows-side
+  too (WASAPI loopback already gives the same two-track feed).
 - ✅ **Native macOS notification on meeting detection.** Shipped in 0.28.0. A
   system notification ("Meeting detected", with a **Record** action) fires when
   another app starts using the mic while AI Meeting Notes is backgrounded/hidden
