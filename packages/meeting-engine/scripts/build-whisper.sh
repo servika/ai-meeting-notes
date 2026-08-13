@@ -11,6 +11,8 @@ set -euo pipefail
 
 # Pinned whisper.cpp version (bump deliberately).
 WHISPER_REF="v1.8.6"
+# Must match the app's minimum (Package.swift `.macOS(...)` / LSMinimumSystemVersion).
+DEPLOYMENT_TARGET="14.4"
 REPO="https://github.com/ggml-org/whisper.cpp.git"
 
 cd "$(dirname "$0")/.."          # packages/meeting-engine
@@ -29,10 +31,27 @@ if [[ ! -s "$VAD_OUT" ]]; then
   curl -fsSL -o "$VAD_OUT" "$VAD_URL"
 fi
 
+# A binary whose `minos` is newer than the app's minimum launches fine here but
+# dies at dyld time on an older Mac (see the deployment-target note below), so
+# check it rather than trust the cache.
+check_minos() {
+  local got
+  got="$(otool -l "$1" | awk '/LC_BUILD_VERSION/{f=1} f&&/minos/{print $2; exit}')"
+  if [[ "$got" != "$DEPLOYMENT_TARGET" ]]; then
+    echo "ERROR: $1 targets macOS ${got:-?}, expected ${DEPLOYMENT_TARGET}." >&2
+    echo "       It would crash on macOS < ${got:-?} with a dyld 'Symbol not found' error." >&2
+    return 1
+  fi
+  echo "  minos: $got (matches the app minimum)"
+}
+
 if [[ "${1:-}" != "--force" && -x "$OUT" ]]; then
   echo "whisper-cli already built: $OUT ($(file -b "$OUT" | cut -d, -f1,2))"
-  echo "  (use --force to rebuild)"
-  exit 0
+  if check_minos "$OUT"; then
+    echo "  (use --force to rebuild)"
+    exit 0
+  fi
+  echo "  cached binary is stale - rebuilding..." >&2
 fi
 
 # Fetch source at the pinned ref (shallow, cached).
@@ -47,8 +66,17 @@ else
 fi
 
 # Configure + build only the whisper-cli target, statically, native arch.
+#
+# CMAKE_OSX_DEPLOYMENT_TARGET must match the app's minimum (Package.swift
+# `.macOS("14.4")` / LSMinimumSystemVersion). Without it cmake stamps the
+# builder's own OS as `minos`, and the linker then *strongly* binds Metal
+# classes newer than 14.4 (e.g. MTLResidencySetDescriptor, macOS 15+). The
+# binary still launches on an older Mac and dies at dyld time with
+# "Symbol not found: _OBJC_CLASS_$_MTLResidencySetDescriptor" (exit 6).
+# With the target set, those classes are weak-linked and ggml's existing
+# `if (@available(macOS 15.0, ...))` guards take the fallback path.
 ARCH="$(uname -m)"
-echo "Building whisper-cli (static, ${ARCH})..."
+echo "Building whisper-cli (static, ${ARCH}, macOS ${DEPLOYMENT_TARGET}+)..."
 cmake -S "$SRC" -B "$BUILD" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
@@ -58,6 +86,7 @@ cmake -S "$SRC" -B "$BUILD" \
   -DWHISPER_BUILD_TESTS=OFF \
   -DWHISPER_BUILD_SERVER=OFF \
   -DCMAKE_OSX_ARCHITECTURES="$ARCH" \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" \
   >/dev/null
 cmake --build "$BUILD" --config Release --target whisper-cli -j "$(sysctl -n hw.ncpu)" >/dev/null
 
@@ -71,5 +100,6 @@ chmod +x "$OUT"
 
 echo "built: $OUT"
 file -b "$OUT" | sed 's/^/  /'
+check_minos "$OUT"
 echo "  dylib deps (should be system-only):"
 otool -L "$OUT" | tail -n +2 | grep -v '/usr/lib/\|/System/' | sed 's/^/  ⚠️  /' || echo "    (none - fully self-contained)"

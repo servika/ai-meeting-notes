@@ -14,6 +14,21 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.38.4] - 2026-08-13
+
+#### Fixed
+- **Transcription no longer fails with a dyld crash on macOS 14 and 15.** The
+  bundled `whisper-cli` was compiled without an explicit deployment target, so
+  it inherited the build machine's OS as its minimum (macOS 26 for the 0.38.3
+  release) and *strongly* linked Metal classes newer than the app's own 14.4
+  minimum. On an older Mac the binary launched and then died at load time -
+  `whisper-cli exited 6: dyld: Symbol not found: _OBJC_CLASS_$_MTLResidencySetDescriptor`
+  (macOS 15+) - surfaced in the app as a "Failed:" message with no transcript.
+  `scripts/build-whisper.sh` now passes `-DCMAKE_OSX_DEPLOYMENT_TARGET=14.4`, so
+  those classes are weak-linked and ggml's existing `@available(macOS 15.0, *)`
+  guards take the fallback path. The script also verifies `minos` after building
+  (and rejects a stale cached binary) so a mismatch can't reach a release again.
+
 ### [0.38.3] - 2026-07-28
 
 #### Fixed
