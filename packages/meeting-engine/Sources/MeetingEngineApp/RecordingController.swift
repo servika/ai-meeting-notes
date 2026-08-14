@@ -127,14 +127,14 @@ final class RecordingController: ObservableObject {
 			// then persisted per meeting and can be corrected before re-generating.
 			let speakers = self.settings.speakerRecognitionEnabled ? self.settings.speakerCount : 0
 			do {
-				let (transcript, summary, model, summaryError) = try self.transcribeAndSummarize(systemWav: result.systemURL.path, micWav: result.micURL.path, speakerCount: speakers, cancel: token)
+				let (transcript, summary, model, summaryModel, summaryError) = try self.transcribeAndSummarize(systemWav: result.systemURL.path, micWav: result.micURL.path, speakerCount: speakers, cancel: token)
 				// Apply the audio-retention policy - but only when transcription ran,
 				// so an audio-only recording is never compressed/deleted out from under
 				// the user (the audio is the content in that case).
 				let policy = self.settings.transcribeMeetings ? self.settings.audioRetention : "original"
 				if policy != "original" { DispatchQueue.main.async { self.status = "Optimizing audio…" } }
 				let audioExt = Self.finalizeAudio(systemWav: result.systemURL.path, micWav: result.micURL.path, policy: policy)
-				let note = Self.buildNote(title: title, date: stamp, audioBase: audioBase, durationSeconds: Int(result.duration.rounded()), speakerCount: speakers, summary: summary, transcript: transcript, audioExt: audioExt, model: model)
+				let note = Self.buildNote(title: title, date: stamp, audioBase: audioBase, durationSeconds: Int(result.duration.rounded()), speakerCount: speakers, summary: summary, transcript: transcript, audioExt: audioExt, model: model, summaryModel: summaryModel)
 				try note.write(to: noteURL, atomically: true, encoding: .utf8)
 				Self.recordRate(audioSeconds: result.duration, model: estModel, processingSeconds: Date().timeIntervalSince(self.procStart ?? Date()))
 				let saved = "Saved \(noteURL.lastPathComponent)" + Self.audioStatusSuffix(policy)
@@ -193,18 +193,25 @@ final class RecordingController: ObservableObject {
 			let estModel = self.settings.modelPath(for: self.settings.language.isEmpty ? "auto" : self.settings.language)
 			self.beginEstimate(audioSeconds: Double(dur), model: estModel)
 			do {
-				let (transcript, summary, model, summaryError) = try self.transcribeAndSummarize(systemWav: systemWav, micWav: micWav, speakerCount: speakers, cancel: token)
+				let (transcript, summary, model, summaryModel, summaryError) = try self.transcribeAndSummarize(systemWav: systemWav, micWav: micWav, speakerCount: speakers, cancel: token)
 				// If this run's summary failed (e.g. an overloaded local model timed out),
 				// don't wipe the note's existing summary - keep it rather than overwrite it
 				// with nothing. The transcript is always refreshed.
 				var finalSummary = summary
+				var finalSummaryModel = summaryModel
 				if summaryError != nil {
 					let previous = Self.existingSummaryBlock(in: content)
-					if !previous.isEmpty { finalSummary = previous }
+					// Keeping the old summary means keeping the model that wrote it -
+					// otherwise the note would credit this run's engine for text it
+					// didn't produce (or drop the attribution entirely).
+					if !previous.isEmpty {
+						finalSummary = previous
+						finalSummaryModel = Self.frontmatterValue("summary_model", in: content) ?? ""
+					}
 				}
 				// Re-generate only re-transcribes; it never changes the audio. Use the
 				// "Compress audio" action to shrink a recording without re-transcribing.
-				let note = Self.buildNote(title: title, date: date, audioBase: audioBase, durationSeconds: dur, speakerCount: speakers, summary: finalSummary, transcript: transcript, audioExt: audioExt, model: model)
+				let note = Self.buildNote(title: title, date: date, audioBase: audioBase, durationSeconds: dur, speakerCount: speakers, summary: finalSummary, transcript: transcript, audioExt: audioExt, model: model, summaryModel: finalSummaryModel)
 				try note.write(to: noteURL, atomically: true, encoding: .utf8)
 				Self.recordRate(audioSeconds: Double(dur), model: estModel, processingSeconds: Date().timeIntervalSince(self.procStart ?? Date()))
 				if let summaryError {
@@ -259,7 +266,7 @@ final class RecordingController: ObservableObject {
 
 	/// Transcribe both tracks (with weighted progress) and summarize. Runs on a
 	/// background queue; updates `progress`/`status` on the main queue.
-	private func transcribeAndSummarize(systemWav: String, micWav: String, speakerCount: Int, cancel: CancelToken) throws -> (transcript: String, summary: String, model: String, summaryError: String?) {
+	private func transcribeAndSummarize(systemWav: String, micWav: String, speakerCount: Int, cancel: CancelToken) throws -> (transcript: String, summary: String, model: String, summaryModel: String, summaryError: String?) {
 		let lang = settings.language.isEmpty ? "auto" : settings.language
 		let model = (settings.modelPath(for: lang) as NSString).expandingTildeInPath
 		let hint = settings.transcriptionPrompt
@@ -303,6 +310,7 @@ final class RecordingController: ObservableObject {
 		// Callers use it to avoid clobbering a good existing summary with nothing and to
 		// report the failure honestly instead of a false "done".
 		var summary = ""
+		var summaryModel = ""
 		var summaryError: String?
 		if settings.summarizeMeetings, !transcript.isEmpty, let engine = Self.engine(from: settings) {
 			DispatchQueue.main.async { self.status = "Summarizing…"; self.progress = 0.92 }
@@ -310,12 +318,15 @@ final class RecordingController: ObservableObject {
 			do {
 				summary = try Summarizer.summarize(transcript: transcript, prompt: prompt, engine: engine)
 				if summary.isEmpty { summaryError = "the model returned an empty summary" }
+				// Only claim a model when it actually produced a summary - an empty or
+				// failed run must not label the note with a model that wrote nothing.
+				if !summary.isEmpty { summaryModel = engine.label }
 			} catch {
 				summaryError = "\(error)"
 				DispatchQueue.main.async { self.status = "Summary failed: \(error)" }
 			}
 		}
-		return (transcript, summary, usedModel, summaryError)
+		return (transcript, summary, usedModel, summaryModel, summaryError)
 	}
 
 	/// The summary markdown block (the `## …` sections before Transcript/Audio) from
@@ -381,7 +392,7 @@ final class RecordingController: ObservableObject {
 	/// the audio was deleted after transcription.
 	/// Internal rather than private so the tests can pin the note format (it has to
 	/// stay byte-compatible with the Windows app - see NOTE-FORMAT.md).
-	static func buildNote(title: String, date: String, audioBase: String, durationSeconds: Int, speakerCount: Int = 0, summary: String, transcript: String, audioExt: String? = "wav", model: String = "") -> String {
+	static func buildNote(title: String, date: String, audioBase: String, durationSeconds: Int, speakerCount: Int = 0, summary: String, transcript: String, audioExt: String? = "wav", model: String = "", summaryModel: String = "") -> String {
 		let audioName = (audioBase as NSString).lastPathComponent
 		var s = "---\ntype: meeting\ntags: [meeting]\ndate: \(date)\naudio: \(audioBase)\n"
 		if durationSeconds > 0 { s += "duration: \(durationSeconds)\n" }
@@ -389,6 +400,10 @@ final class RecordingController: ObservableObject {
 		// Which whisper model produced this transcript - so a garbled note is
 		// traceable to the model used (e.g. a weak default vs. large-v3-turbo).
 		if !model.isEmpty { s += "model: \(model)\n" }
+		// Which engine + model wrote the summary (`provider/model`), so summary
+		// quality is comparable across engines on a real archive. Absent when the
+		// note has no summary.
+		if !summaryModel.isEmpty { s += "summary_model: \(summaryModel)\n" }
 		s += "app_version: \(appVersion)\n"
 		s += "---\n\n# \(title)\n\n"
 		if !summary.isEmpty { s += summary + "\n\n" }

@@ -30,6 +30,8 @@ date: 2026-06-24 09-30-00
 audio: recordings/Meeting 2026-06-24 09-30-00
 duration: 1800
 speakers: 3
+model: ggml-large-v3-turbo.bin
+summary_model: ollama/llama3.1:8b
 app_version: 0.1.0
 ---
 
@@ -74,7 +76,13 @@ app_version: 0.1.0
 | `audio` | yes | Vault-relative stem of the two audio tracks (no extension). |
 | `duration` | if > 0 | Recording length in seconds. |
 | `speakers` | if ≥ 2 | Fixed remote-speaker count (diarization); absent means auto. |
+| `model` | if known | The whisper model file that produced the transcript, so a garbled transcript is traceable to the model used. |
+| `summary_model` | if summarized | Engine + model that wrote the summary, as `provider/model` (e.g. `ollama/llama3.1:8b`, `claude/claude-opus-4-8`). Absent when there's no summary. Never contains an API key. On a re-generate whose summary failed, the note keeps the previous summary *and* this value. |
 | `app_version` | yes | App version that produced the note. |
+
+Keys are written in the order above; readers must not depend on it (use
+`frontmatterValue` / `NoteFormat.FrontmatterValue`), but both apps emit it
+identically so notes stay byte-comparable.
 
 ## Body conventions
 

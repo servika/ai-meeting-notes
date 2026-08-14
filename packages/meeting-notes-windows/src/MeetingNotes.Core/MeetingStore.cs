@@ -26,13 +26,13 @@ public sealed class MeetingStore(string meetingsFolder)
     public string WriteNote(
         string title, DateTime date, string audioBase, int durationSeconds,
         int speakerCount, string summary, string transcript, string appVersion,
-        string audioExt = "wav")
+        string audioExt = "wav", string summaryModel = "")
     {
         Directory.CreateDirectory(meetingsFolder);
         var body = NoteFormat.BuildNote(
             title, date.ToString(DateFormat, CultureInfo.InvariantCulture),
             audioBase, durationSeconds, speakerCount, summary, transcript, appVersion,
-            audioExt);
+            audioExt, summaryModel: summaryModel);
         var path = Path.Combine(meetingsFolder, Sanitize(title) + ".md");
         File.WriteAllText(path, body);
         return path;

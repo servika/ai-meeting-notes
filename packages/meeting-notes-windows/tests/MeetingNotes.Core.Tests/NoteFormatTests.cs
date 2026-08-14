@@ -47,9 +47,43 @@ public class NoteFormatTests
 
         Assert.DoesNotContain("duration:", note);
         Assert.DoesNotContain("speakers:", note); // 1 < 2, so omitted
+        Assert.DoesNotContain("summary_model:", note); // no summary == nothing to credit
         Assert.Contains("## Transcript\n\n_(no speech detected)_\n", note);
         // No blank summary block between the title and the Transcript heading.
         Assert.Contains("# Quick chat\n\n## Transcript", note);
+    }
+
+    /// <summary>
+    /// summary_model must match what the macOS app writes, byte for byte, and must
+    /// not collide with the whisper `model:` key.
+    /// </summary>
+    [Fact]
+    public void BuildNote_writes_summary_model_after_model()
+    {
+        var note = NoteFormat.BuildNote(
+            title: "Daily sync", date: "2026-06-24 09-30-00",
+            audioBase: "recordings/Daily sync",
+            durationSeconds: 60, speakerCount: 0,
+            summary: "## Summary\n\nx", transcript: "y", appVersion: "0.1.0",
+            audioExt: "wav", model: "ggml-large-v3-turbo.bin",
+            summaryModel: "claude/claude-opus-4-8");
+
+        Assert.Contains(
+            "model: ggml-large-v3-turbo.bin\nsummary_model: claude/claude-opus-4-8\napp_version: 0.1.0\n",
+            note);
+        Assert.Equal("ggml-large-v3-turbo.bin", NoteFormat.FrontmatterValue("model", note));
+        Assert.Equal("claude/claude-opus-4-8", NoteFormat.FrontmatterValue("summary_model", note));
+    }
+
+    [Fact]
+    public void SummaryEngine_label_carries_provider_and_model_without_the_api_key()
+    {
+        Assert.Equal("ollama/llama3.1:8b",
+            new SummaryEngine.Ollama("http://localhost:11434", "llama3.1:8b").Label);
+
+        var claude = new SummaryEngine.Claude("sk-ant-secret", "claude-opus-4-8");
+        Assert.Equal("claude/claude-opus-4-8", claude.Label);
+        Assert.DoesNotContain("secret", claude.Label);
     }
 
     [Fact]

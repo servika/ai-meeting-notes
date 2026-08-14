@@ -37,6 +37,7 @@ public sealed class MeetingPipeline(
     {
         var transcript = "";
         var summary = "";
+        var summaryModel = "";
         string? summaryWarning = null;
 
         // Stop before doing any work if the user already hit Stop; the stages that
@@ -78,6 +79,8 @@ public sealed class MeetingPipeline(
                         : null;
                     summary = await summarizer.SummarizeAsync(
                         transcript, opts.SummaryPrompt, opts.Engine, ct, sumProgress);
+                    // Only credit a model that actually produced text.
+                    if (summary.Length > 0) summaryModel = opts.Engine.Label;
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
@@ -91,7 +94,7 @@ public sealed class MeetingPipeline(
         progress?.Report(new(0.98, "Saving note…"));
         var path = store.WriteNote(
             title, date, audioBase, durationSeconds, speakerCount,
-            summary, transcript, opts.AppVersion);
+            summary, transcript, opts.AppVersion, summaryModel: summaryModel);
         return new PipelineResult(path, summaryWarning);
     }
 }

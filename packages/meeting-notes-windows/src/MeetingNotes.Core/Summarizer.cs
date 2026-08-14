@@ -9,6 +9,18 @@ public abstract record SummaryEngine
 {
     public sealed record Ollama(string Url, string Model) : SummaryEngine;
     public sealed record Claude(string ApiKey, string Model) : SummaryEngine;
+
+    /// <summary>
+    /// "provider/model" - recorded in the note so a summary can be traced back to
+    /// what produced it. Never contains the API key. Matches the macOS
+    /// SummaryEngine.label so both apps write the same value.
+    /// </summary>
+    public string Label => this switch
+    {
+        Ollama o => "ollama/" + o.Model,
+        Claude c => "claude/" + c.Model,
+        _ => "",
+    };
 }
 
 public sealed class SummaryException(string message) : Exception(message);

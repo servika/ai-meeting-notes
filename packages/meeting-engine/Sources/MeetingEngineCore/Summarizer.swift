@@ -6,6 +6,17 @@ import Foundation
 public enum SummaryEngine {
 	case ollama(url: String, model: String)
 	case claude(apiKey: String, model: String)
+
+	/// `provider/model` - recorded in the note so a summary can be traced back to
+	/// what produced it (the engine and model are both settings the user changes
+	/// over time, so the note is the only place that knows). Never contains the
+	/// API key.
+	public var label: String {
+		switch self {
+		case let .ollama(_, model): return "ollama/\(model)"
+		case let .claude(_, model): return "claude/\(model)"
+		}
+	}
 }
 
 public enum Summarizer {

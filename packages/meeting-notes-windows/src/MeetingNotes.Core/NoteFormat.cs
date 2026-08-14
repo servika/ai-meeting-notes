@@ -22,7 +22,8 @@ public static class NoteFormat
         string transcript,
         string appVersion,
         string audioExt = "wav",
-        string model = "")
+        string model = "",
+        string summaryModel = "")
     {
         var audioName = LastPathComponent(audioBase);
 
@@ -30,6 +31,9 @@ public static class NoteFormat
         if (durationSeconds > 0) s += "duration: " + durationSeconds + "\n";
         if (speakerCount >= 2) s += "speakers: " + speakerCount + "\n";
         if (!string.IsNullOrEmpty(model)) s += "model: " + model + "\n";
+        // Which engine + model wrote the summary ("provider/model"), so summary
+        // quality is comparable across engines. Absent when there's no summary.
+        if (!string.IsNullOrEmpty(summaryModel)) s += "summary_model: " + summaryModel + "\n";
         s += "app_version: " + appVersion + "\n";
         s += "---\n\n# " + title + "\n\n";
         if (!string.IsNullOrEmpty(summary)) s += summary + "\n\n";

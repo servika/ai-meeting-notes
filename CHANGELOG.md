@@ -14,6 +14,20 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.39.0] - 2026-08-14
+
+#### Added
+- **Notes record which model wrote the summary.** New `summary_model:` frontmatter
+  key holding `provider/model` (e.g. `ollama/llama3.1:8b`,
+  `claude/claude-opus-4-8`), so summary quality is comparable across engines on a
+  real archive - until now the note kept the whisper model (`model:`) but nothing
+  about the summary engine, and both are settings that change over time. Written
+  only when a summary was actually produced, and never contains the API key. A
+  re-generate whose summary fails keeps the previous summary *and* its
+  `summary_model`, so the note never credits an engine for text it didn't write.
+  Documented in [NOTE-FORMAT.md](NOTE-FORMAT.md) (which was also missing the
+  existing `model:` key).
+
 ### [0.38.4] - 2026-08-13
 
 #### Fixed
@@ -757,6 +771,14 @@ First release of the standalone macOS app.
 ---
 
 ## Windows app
+
+### [0.7.0] - 2026-08-14
+
+#### Added
+- **Notes record which model wrote the summary** (`summary_model:` frontmatter,
+  `provider/model`) - the port of the macOS 0.39.0 change, emitting the same value
+  byte for byte so notes stay interchangeable. See
+  [NOTE-FORMAT.md](NOTE-FORMAT.md).
 
 ### [0.6.0] - 2026-08-04
 

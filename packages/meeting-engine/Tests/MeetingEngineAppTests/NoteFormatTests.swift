@@ -4,6 +4,7 @@
 
 import XCTest
 @testable import MeetingEngineApp
+import MeetingEngineCore
 
 final class BuildNoteTests: XCTestCase {
 
@@ -17,7 +18,8 @@ final class BuildNoteTests: XCTestCase {
 			summary: "## Short summary\nWe shipped it.",
 			transcript: "[0:00] **You:** Hello.",
 			audioExt: "m4a",
-			model: "large-v3-turbo")
+			model: "large-v3-turbo",
+			summaryModel: "ollama/llama3.1:8b")
 
 		XCTAssertEqual(note, """
 		---
@@ -28,6 +30,7 @@ final class BuildNoteTests: XCTestCase {
 		duration: 1800
 		speakers: 3
 		model: large-v3-turbo
+		summary_model: ollama/llama3.1:8b
 		app_version: \(appVersion)
 		---
 
@@ -60,6 +63,26 @@ final class BuildNoteTests: XCTestCase {
 		XCTAssertFalse(note.contains("duration:"))
 		XCTAssertFalse(note.contains("speakers:"))  // 1 speaker == the plain "Them"
 		XCTAssertFalse(note.contains("model:"))
+		XCTAssertFalse(note.contains("summary_model:"))  // no summary == nothing to credit
+	}
+
+	/// `summary_model:` must not collide with the whisper `model:` key - a reader
+	/// asking for one must never get the other.
+	func testSummaryModelAndTranscriptModelAreSeparateKeys() {
+		let note = RecordingController.buildNote(
+			title: "T", date: "D", audioBase: "recordings/T",
+			durationSeconds: 10, speakerCount: 0, summary: "## Short summary\nx",
+			transcript: "x", model: "large-v3-turbo", summaryModel: "claude/claude-opus-4-8")
+		XCTAssertEqual(RecordingController.frontmatterValue("model", in: note), "large-v3-turbo")
+		XCTAssertEqual(RecordingController.frontmatterValue("summary_model", in: note), "claude/claude-opus-4-8")
+	}
+
+	func testSummaryModelLabelsCarryProviderAndModelWithoutTheAPIKey() {
+		XCTAssertEqual(SummaryEngine.ollama(url: "http://localhost:11434", model: "llama3.1:8b").label,
+			"ollama/llama3.1:8b")
+		let claude = SummaryEngine.claude(apiKey: "sk-ant-secret", model: "claude-opus-4-8")
+		XCTAssertEqual(claude.label, "claude/claude-opus-4-8")
+		XCTAssertFalse(claude.label.contains("secret"))
 	}
 
 	func testEmptyTranscriptGetsThePlaceholderNotAnEmptySection() {
