@@ -48,42 +48,52 @@ struct MeetingDetail: View {
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 0) {
-			HStack(spacing: 8) {
+			HStack(spacing: 12) {
 				TextField("Title", text: $titleField)
 					.textFieldStyle(.plain)
 					.font(.title2.weight(.semibold))
+					.lineLimit(1)
+					.frame(minWidth: 140, maxWidth: .infinity, alignment: .leading)
+					.layoutPriority(1)
 					.onSubmit { onRename(titleField) }
-				Spacer()
-				Button {
-					NSPasteboard.general.clearContents()
-					NSPasteboard.general.setString(copyText(for: tab), forType: .string)
-					copied = true
-					DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
-				} label: { Image(systemName: copied ? "checkmark" : "doc.on.doc") }
-					.help(tab == 0 ? "Copy summary" : tab == 1 ? "Copy transcript" : "Copy full note as Markdown")
-				Button { onRename(titleField) } label: { Image(systemName: "pencil") }
-					.help("Rename")
-					.disabled(titleField.trimmingCharacters(in: .whitespaces).isEmpty || titleField == meeting.title)
-				Button { onRegenerate(settings.speakerRecognitionEnabled ? speakerCount : nil) } label: { Image(systemName: "arrow.clockwise") }
-					.help("Re-transcribe & summarize")
-					.disabled(busy)
-				// Cut the tail off a recording the user forgot to stop; opens a
-				// dedicated trim window. Needs playable audio to trim.
-				if !audioURLs.isEmpty && !busy {
-					Button { openWindow(id: "audio-trim", value: meeting.id) } label: { Image(systemName: "scissors") }
-						.help("Trim recording (cut off the end)")
+				// Icon-only, borderless actions with a fixed size: bordered buttons are
+				// wide enough on macOS 26 that a row of them squeezed the title field
+				// down to an invisible sliver in a normal-width window.
+				HStack(spacing: 10) {
+					Button {
+						NSPasteboard.general.clearContents()
+						NSPasteboard.general.setString(copyText(for: tab), forType: .string)
+						copied = true
+						DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+					} label: { Image(systemName: copied ? "checkmark" : "doc.on.doc") }
+						.help(tab == 0 ? "Copy summary" : tab == 1 ? "Copy transcript" : "Copy full note as Markdown")
+					Button { onRename(titleField) } label: { Image(systemName: "pencil") }
+						.help("Rename")
+						.disabled(titleField.trimmingCharacters(in: .whitespaces).isEmpty || titleField == meeting.title)
+					Button { onRegenerate(settings.speakerRecognitionEnabled ? speakerCount : nil) } label: { Image(systemName: "arrow.clockwise") }
+						.help("Re-transcribe & summarize")
+						.disabled(busy)
+					// Cut the tail off a recording the user forgot to stop; opens a
+					// dedicated trim window. Needs playable audio to trim.
+					if !audioURLs.isEmpty && !busy {
+						Button { openWindow(id: "audio-trim", value: meeting.id) } label: { Image(systemName: "scissors") }
+							.help("Trim recording (cut off the end)")
+					}
+					// Only offer Compress when the meeting is idle and still has WAVs -
+					// i.e. an interrupted/failed recording. During normal processing the
+					// pipeline compresses at the end, so showing it then just looks like
+					// auto-compression didn't happen (the busy bar already reports it).
+					if hasUncompressedAudio && !busy {
+						Button { onCompress() } label: { Image(systemName: "arrow.down.right.and.arrow.up.left") }
+							.help("Compress audio to save space (no re-transcribing)")
+					}
+					Button(role: .destructive) { confirmingDelete = true } label: { Image(systemName: "trash") }
+						.help("Delete meeting")
+						.disabled(busy)
 				}
-				// Only offer Compress when the meeting is idle and still has WAVs -
-				// i.e. an interrupted/failed recording. During normal processing the
-				// pipeline compresses at the end, so showing it then just looks like
-				// auto-compression didn't happen (the busy bar already reports it).
-				if hasUncompressedAudio && !busy {
-					Button { onCompress() } label: { Image(systemName: "arrow.down.right.and.arrow.up.left") }
-						.help("Compress audio to save space (no re-transcribing)")
-				}
-				Button(role: .destructive) { confirmingDelete = true } label: { Image(systemName: "trash") }
-					.help("Delete meeting")
-					.disabled(busy)
+				.buttonStyle(.borderless)
+				.imageScale(.large)
+				.fixedSize()
 			}
 			.padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 10)
 			.confirmationDialog("Delete “\(meeting.title)”?", isPresented: $confirmingDelete) {

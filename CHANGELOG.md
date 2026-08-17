@@ -14,6 +14,17 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.39.1] - 2026-08-17
+
+#### Fixed
+- **The meeting title was invisible on macOS 26.** The title row shares one line
+  with the action buttons, and Tahoe's bordered buttons are wide enough that the
+  editable title field collapsed to an invisible sliver in a normal-width window -
+  the text cursor still appeared over it, but there was no title to see (it came
+  back only when the window was stretched to full width). The actions are now
+  borderless icons with a fixed size, and the title field keeps a minimum width
+  and layout priority, so the title stays readable at any window size.
+
 ### [0.39.0] - 2026-08-14
 
 #### Added
