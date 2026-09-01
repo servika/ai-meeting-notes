@@ -99,10 +99,6 @@ final class RecordingController: ObservableObject {
 		status = "Finishing recording…"
 		startElapsedTimer()
 		let stamp = self.stamp
-		// The note we've been tracking for this recording since `start()`. It's
-		// updated through in-app renames (see MeetingStore.rename callers), so it
-		// stays valid even when the placeholder is renamed mid-recording.
-		let preferredPath = self.activeID
 		let token = CancelToken()
 		cancelToken = token
 		guard let meetingsDir = settings.meetingsDirURL else { busy = false; stopElapsedTimer(); return }
@@ -115,14 +111,11 @@ final class RecordingController: ObservableObject {
 			let estModel = self.settings.modelPath(for: self.settings.language.isEmpty ? "auto" : self.settings.language)
 			self.beginEstimate(audioSeconds: result.duration, model: estModel)
 			let audioBase = "recordings/Meeting \(stamp)"
-			// Follow a rename made during recording so we update the placeholder note
-			// instead of creating a duplicate: prefer the note we've been tracking
-			// (`preferredPath`), then any note already linking this recording, and only
-			// then fall back to a fresh filename. Relying on the frontmatter re-scan
-			// alone let a transient miss spawn a second, notes-less note.
-			let noteURL = Self.targetNoteURL(preferredPath: preferredPath, audioBase: audioBase, in: meetingsDir)
-				?? meetingsDir.appendingPathComponent("Meeting \(stamp).md")
-			let title = noteURL.deletingPathExtension().lastPathComponent
+			// Follow a rename made during recording *or* while this transcription runs,
+			// so we update the placeholder note instead of creating a duplicate. The
+			// destination is resolved right before each write (see `currentNoteURL`),
+			// never up front: transcription takes minutes and the note can move under us.
+			let fallbackURL = meetingsDir.appendingPathComponent("Meeting \(stamp).md")
 			// New recordings seed their speaker count from the current setting; it's
 			// then persisted per meeting and can be corrected before re-generating.
 			let speakers = self.settings.speakerRecognitionEnabled ? self.settings.speakerCount : 0
@@ -134,6 +127,8 @@ final class RecordingController: ObservableObject {
 				let policy = self.settings.transcribeMeetings ? self.settings.audioRetention : "original"
 				if policy != "original" { DispatchQueue.main.async { self.status = "Optimizing audio…" } }
 				let audioExt = Self.finalizeAudio(systemWav: result.systemURL.path, micWav: result.micURL.path, policy: policy)
+				let noteURL = self.currentNoteURL(audioBase: audioBase, in: meetingsDir, fallback: fallbackURL)
+				let title = noteURL.deletingPathExtension().lastPathComponent
 				let note = Self.buildNote(title: title, date: stamp, audioBase: audioBase, durationSeconds: Int(result.duration.rounded()), speakerCount: speakers, summary: summary, transcript: transcript, audioExt: audioExt, model: model, summaryModel: summaryModel)
 				try note.write(to: noteURL, atomically: true, encoding: .utf8)
 				Self.recordRate(audioSeconds: result.duration, model: estModel, processingSeconds: Date().timeIntervalSince(self.procStart ?? Date()))
@@ -142,6 +137,8 @@ final class RecordingController: ObservableObject {
 					: "⚠️ \(saved) - summary failed (\(summaryError!)). Re-generate to retry.")
 			} catch is CancelledError {
 				// Keep the recording as a re-generatable note.
+				let noteURL = self.currentNoteURL(audioBase: audioBase, in: meetingsDir, fallback: fallbackURL)
+				let title = noteURL.deletingPathExtension().lastPathComponent
 				let note = Self.buildNote(title: title, date: stamp, audioBase: audioBase, durationSeconds: Int(result.duration.rounded()), speakerCount: speakers, summary: "",
 					transcript: "_Transcription stopped. Open this meeting and click Re-generate to process it._")
 				try? note.write(to: noteURL, atomically: true, encoding: .utf8)
@@ -211,14 +208,18 @@ final class RecordingController: ObservableObject {
 				}
 				// Re-generate only re-transcribes; it never changes the audio. Use the
 				// "Compress audio" action to shrink a recording without re-transcribing.
-				let note = Self.buildNote(title: title, date: date, audioBase: audioBase, durationSeconds: dur, speakerCount: speakers, summary: finalSummary, transcript: transcript, audioExt: audioExt, model: model, summaryModel: finalSummaryModel)
-				try note.write(to: noteURL, atomically: true, encoding: .utf8)
+				// Re-resolve the note here, not up front: a rename during the (minutes-long)
+				// re-generation would otherwise recreate the old filename as a duplicate.
+				let outURL = self.currentNoteURL(audioBase: audioBase, in: meetingsDir, fallback: noteURL)
+				let outTitle = outURL.deletingPathExtension().lastPathComponent
+				let note = Self.buildNote(title: outTitle, date: date, audioBase: audioBase, durationSeconds: dur, speakerCount: speakers, summary: finalSummary, transcript: transcript, audioExt: audioExt, model: model, summaryModel: finalSummaryModel)
+				try note.write(to: outURL, atomically: true, encoding: .utf8)
 				Self.recordRate(audioSeconds: Double(dur), model: estModel, processingSeconds: Date().timeIntervalSince(self.procStart ?? Date()))
 				if let summaryError {
 					let kept = Self.existingSummaryBlock(in: content).isEmpty ? "" : " (kept the previous one)"
 					self.finish(status: "⚠️ Re-generated transcript - summary failed\(kept): \(summaryError)")
 				} else {
-					self.finish(status: "✅ Re-generated \(title)")
+					self.finish(status: "✅ Re-generated \(outTitle)")
 				}
 			} catch is CancelledError {
 				self.finish(status: "Stopped. The existing note is unchanged.")
@@ -250,11 +251,16 @@ final class RecordingController: ObservableObject {
 			}
 			let ext = Self.finalizeAudio(systemWav: systemWav, micWav: micWav, policy: "compressed")
 			if ext == "m4a" {
+				// Re-resolve (and re-read) the note at write time - it may have been
+				// renamed while compressing, and writing the stale path back would
+				// resurrect the old filename as a duplicate.
+				let outURL = self.currentNoteURL(audioBase: audioBase, in: meetingsDir, fallback: noteURL)
+				let current = (try? String(contentsOf: outURL, encoding: .utf8)) ?? content
 				let audioName = (audioBase as NSString).lastPathComponent
-				let updated = content
+				let updated = current
 					.replacingOccurrences(of: "\(audioName).mic.wav", with: "\(audioName).mic.m4a")
 					.replacingOccurrences(of: "\(audioName).system.wav", with: "\(audioName).system.m4a")
-				try? updated.write(to: noteURL, atomically: true, encoding: .utf8)
+				try? updated.write(to: outURL, atomically: true, encoding: .utf8)
 				self.finish(status: "✅ Audio compressed")
 			} else {
 				self.finish(status: "Couldn't compress audio (kept the original).")
@@ -447,6 +453,19 @@ final class RecordingController: ObservableObject {
 			if frontmatterValue("audio", in: content) == audioBase { return url }
 		}
 		return existingNoteURL(audioBase: audioBase, in: dir)
+	}
+
+	/// `activeID` read from a background queue without racing the main thread.
+	private var trackedNotePath: String? {
+		Thread.isMainThread ? activeID : DispatchQueue.main.sync { self.activeID }
+	}
+
+	/// The note to write into *right now*. Processing takes minutes, and the user
+	/// can rename the note while it runs - so the destination has to be re-resolved
+	/// at write time. A URL captured before the run would recreate the pre-rename
+	/// filename and leave the vault with two notes for one meeting.
+	func currentNoteURL(audioBase: String, in dir: URL, fallback: URL) -> URL {
+		Self.targetNoteURL(preferredPath: trackedNotePath, audioBase: audioBase, in: dir) ?? fallback
 	}
 
 	/// Read a `key: value` line from a note's YAML frontmatter block.

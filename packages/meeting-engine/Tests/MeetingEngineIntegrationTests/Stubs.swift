@@ -17,10 +17,13 @@ enum StubWhisper {
 	/// It answers by call order - system track first, then mic, as the pipeline
 	/// transcribes them. (It can't key off the audio path: by then the track has
 	/// been converted to a temp 16 kHz copy, exactly as the real CLI sees it.)
+	/// `delay` (seconds, per call) keeps a run in flight long enough for a test to
+	/// act on the app while it's processing - e.g. rename the note mid-transcription.
 	static func emitting(
 		in dir: URL,
 		system: [(start: Double, end: Double, text: String)],
-		mic: [(start: Double, end: Double, text: String)]
+		mic: [(start: Double, end: Double, text: String)],
+		delay: Double = 0
 	) throws -> String {
 		let id = UUID().uuidString
 		let systemJSON = dir.appendingPathComponent("stub-system-\(id).json")
@@ -29,6 +32,7 @@ enum StubWhisper {
 		try json(for: system).write(to: systemJSON, atomically: true, encoding: .utf8)
 		try json(for: mic).write(to: micJSON, atomically: true, encoding: .utf8)
 		return try script(in: dir, body: """
+			\(delay > 0 ? "sleep \(delay)" : "")
 			N=$(cat "\(counter)" 2>/dev/null || echo 0)
 			N=$((N + 1))
 			echo "$N" > "\(counter)"

@@ -14,6 +14,17 @@ This repo ships these apps, versioned independently:
 
 ## macOS app
 
+### [0.39.2] - 2026-09-01
+
+#### Fixed
+- **Renaming a meeting while it was being processed left two notes.** The
+  destination note was resolved once, before transcription started, and written
+  minutes later - so renaming the note in the meantime made the finished run
+  recreate the pre-rename filename, leaving the vault with two notes for one
+  recording: the renamed one still holding the placeholder, and a duplicate under
+  the old name holding the summary. The note to write into is now re-resolved
+  immediately before every write, in recording, re-generate and compress alike.
+
 ### [0.39.1] - 2026-08-17
 
 #### Fixed

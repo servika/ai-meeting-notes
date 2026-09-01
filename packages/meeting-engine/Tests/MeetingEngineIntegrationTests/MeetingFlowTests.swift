@@ -122,6 +122,34 @@ final class MeetingFlowTests: XCTestCase {
 		XCTAssertTrue(controller.status.hasPrefix("✅"), controller.status)
 	}
 
+	func testRenamingWhileProcessingUpdatesTheRenamedNoteInsteadOfDuplicatingIt() throws {
+		useWhisper(try StubWhisper.emitting(in: vault,
+			system: [(0, 2, "Transcribed after the rename.")], mic: [], delay: 1))
+		useSummaryEngine(try StubSummaryServer.returning("## Short summary\nDone.", in: vault))
+
+		let m = meeting()
+		runToCompletion {
+			controller.regenerate(m)
+			// The user renames the note while transcription is still running - the app
+			// keeps the controller pointed at the renamed note (see ContentView).
+			DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+				guard let renamed = self.store.rename(m, to: "Budget review") else {
+					return XCTFail("rename failed")
+				}
+				self.controller.activeID = renamed.id
+			}
+		}
+
+		let notes = try FileManager.default.contentsOfDirectory(atPath: meetings.path)
+			.filter { $0.hasSuffix(".md") }
+		XCTAssertEqual(notes, ["Budget review.md"], "the run must not resurrect the old filename")
+		let note = try String(
+			contentsOf: meetings.appendingPathComponent("Budget review.md"), encoding: .utf8)
+		XCTAssertTrue(note.contains("Transcribed after the rename."), note)
+		XCTAssertTrue(note.contains("# Budget review"), note)
+		XCTAssertEqual(RecordingController.frontmatterValue("audio", in: note), audioBase)
+	}
+
 	func testTheTranscriptIsWhatGetsSentToTheSummaryEngine() throws {
 		useWhisper(try StubWhisper.emitting(in: vault,
 			system: [(0, 2, "Quarterly numbers look fine.")], mic: []))
