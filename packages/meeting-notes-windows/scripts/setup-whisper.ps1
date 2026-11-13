@@ -4,8 +4,13 @@
   ships bundled (ModelDownloader.ResolveWhisperCli finds it next to the app exe).
 
 .DESCRIPTION
-  Downloads the latest whisper.cpp Windows x64 release zip from GitHub and extracts
-  whisper-cli.exe (plus its DLLs) into src/MeetingNotes.App/vendor/. Re-run to update.
+  Downloads a pinned whisper.cpp Windows x64 build from GitHub and extracts
+  whisper-cli.exe (plus its DLLs) into src/MeetingNotes.App/vendor/.
+
+  whisper.cpp's version tags (v1.9.x) ship no binaries any more - the Windows zips
+  live on the build-number prerelease tags (bNNNN) cut alongside each version, so
+  "releases/latest" can't be used. To update, pick the bNNNN tag published with the
+  new vX.Y.Z and change -Tag's default (b5454 = v1.9.5).
 
   Whisper models are NOT downloaded here - get those in-app via the "Download" button
   (Settings), or with a .bin from https://huggingface.co/ggerganov/whisper.cpp.
@@ -14,6 +19,7 @@
   Run from the package root:  pwsh ./scripts/setup-whisper.ps1
 #>
 param(
+    [string]$Tag = "b5454",                 # whisper.cpp v1.9.5 binaries
     [string]$Asset = "whisper-bin-x64.zip"  # the CPU x64 binary bundle
 )
 
@@ -24,8 +30,8 @@ $root = Split-Path -Parent $PSScriptRoot
 $vendor = Join-Path $root "src/MeetingNotes.App/vendor"
 New-Item -ItemType Directory -Force -Path $vendor | Out-Null
 
-Write-Host "Looking up the latest whisper.cpp release..."
-$rel = Invoke-RestMethod -Uri "https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest" `
+Write-Host "Looking up whisper.cpp release $Tag..."
+$rel = Invoke-RestMethod -Uri "https://api.github.com/repos/ggml-org/whisper.cpp/releases/tags/$Tag" `
     -Headers @{ "User-Agent" = "meeting-notes" }
 $dl = ($rel.assets | Where-Object { $_.name -eq $Asset }).browser_download_url
 if (-not $dl) {

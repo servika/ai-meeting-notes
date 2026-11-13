@@ -39,8 +39,13 @@ jobs:
 
       - name: Bundle whisper-cli
         shell: pwsh
+        # Not best-effort: an installer without whisper-cli.exe can't transcribe,
+        # so a failed download must fail the release rather than ship it.
         run: ./scripts/setup-whisper.ps1
-        continue-on-error: true
+
+      - name: Verify whisper-cli is bundled
+        shell: pwsh
+        run: if (-not (Test-Path src/MeetingNotes.App/vendor/whisper-cli.exe)) { throw "whisper-cli.exe missing from vendor/" }
 
       - name: Publish (self-contained win-x64)
         run: dotnet publish src/MeetingNotes.App -c Release -r win-x64 --self-contained -p:Version=${{ steps.ver.outputs.version }} -o publish/app
