@@ -113,6 +113,23 @@ into the mic). Use a scratch vault, not the real one.
 5. **Long path / unicode** - record with a vault under a path containing spaces and
    non-ASCII characters; note and audio are written correctly.
 
+6. **SmartScreen submission** (human, ~5 min, after the `win-v*` release is published).
+   The installer is unsigned, so every new build starts with zero SmartScreen
+   reputation. Submitting it to Microsoft often clears the "Windows protected your
+   PC" screen for that exact file within a few days:
+   - Download `AI-Meeting-Notes-Setup.exe` from the release (the file users get -
+     its hash must match).
+   - Go to <https://www.microsoft.com/wdsi/filesubmission>, choose **Home customer**
+     (or **Software developer** if signed in with a Microsoft account), product
+     **Microsoft Defender SmartScreen**.
+   - Detection: **Incorrectly detected as malware/malicious**; detection name
+     "Windows protected your PC / unrecognized app"; note that it's an open-source
+     app built by GitHub Actions and link the release.
+   - Repeat for `AI-Meeting-Notes-Windows.zip`'s `MeetingNotes.App.exe` if the
+     portable build matters. Record the submission ID in the release sign-off.
+
+   No reply is needed; the site's Windows download dialog covers users until then.
+
 ## E. Cross-platform note compatibility (agent, ~2 min)
 
 Both apps must read each other's notes.
